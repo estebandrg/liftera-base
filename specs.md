@@ -1,10 +1,12 @@
 Liftera busca crear un software innovador en el fitness. Actualmente no existe una app o software con el mismo potencial de esta idea.
 
 Liftera es una app centralizada en:
+
 - Tracking de sobrecarga progresiva
 - Registro de alimentacion (calorias y macros)
 
 Tambien registra datos clave como:
+
 - Peso corporal.
 - Altura.
 - Etc.
@@ -18,7 +20,7 @@ Liftera tiene el contexto de entrenamiento mediante el tracking de ejercicios y 
 Por lo cual es una herramienta potencial, te imaginas preguntarle a la IA cual es tu RM en un ejercicio directamente?
 Preguntarle por que estas estancado en tal ejercicio?
 Testar metodos de entrenamientos supervisados al 100% por la IA? (usuario: tengo ganas de hacer HD, lo voy a probar 2 meses),
-la ia puede comprobar si esta siendo efectivo, en comparacion con otros metodos de entrenamientos yacentes en los datos del usuario. 
+la ia puede comprobar si esta siendo efectivo, en comparacion con otros metodos de entrenamientos yacentes en los datos del usuario.
 
 Y esas son solo unas pocas de las infinitas posibilidades que tiene liftera gracias a la integracion de IA mas contexto de entrenamiento.
 
