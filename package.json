@@ -1,13 +1,16 @@
 {
-  "name": "liftera-base",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "liftera",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.5.0",
+    "turbo": "^2.5.0"
+  },
   "packageManager": "pnpm@10.34.5"
 }

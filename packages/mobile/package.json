@@ -1,0 +1,10 @@
+{
+  "name": "@liftera/mobile",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "expo start",
+    "build": "expo export",
+    "lint": "eslint ."
+  }
+}
