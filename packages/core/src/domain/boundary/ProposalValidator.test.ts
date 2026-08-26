@@ -7,6 +7,11 @@ import { ExerciseId } from '../exercise/ExerciseId.js';
 import { ProgressionPolicy } from '../recommendation/ProgressionPolicy.js';
 import { Trend } from '../value-objects/Trend.js';
 import { Confidence } from '../value-objects/Confidence.js';
+import { PerformanceSignal } from '../signals/PerformanceSignal.js';
+import { ProgressSignal, ProgressEvidence } from '../signals/ProgressSignal.js';
+import { FatigueSignal } from '../signals/FatigueSignal.js';
+import { RegressionSignal } from '../signals/RegressionSignal.js';
+import { StagnationSignal } from '../signals/StagnationSignal.js';
 
 // Neutral baseline: no signals (no coherence restriction), stable trend,
 // high window confidence so a medium proposal confidence stays below the
@@ -30,6 +35,37 @@ const proposal = (overrides: Partial<TrainingProposal> = {}): TrainingProposal =
   confidence: Confidence.Medium,
   ...overrides,
 });
+
+// Structurally matching, in-ceiling magnitude per action, so rule (b) tests
+// isolate coherence from rules (a) and (c).
+const MAGNITUDE_FOR: Record<DecisionAction, DecisionMagnitude> = {
+  increaseLoad: { kind: 'load', value: 2.5, unit: 'kg' },
+  increaseReps: { kind: 'reps', value: 1 },
+  decreaseLoad: { kind: 'loadPercent', percent: -10 },
+  decreaseVolume: { kind: 'sets', value: -1 },
+  maintain: { kind: 'none' },
+  evaluateChange: { kind: 'none' },
+};
+
+const progress = (overrides: Partial<ProgressEvidence> = {}): ProgressSignal =>
+  new ProgressSignal({
+    windowSize: 3,
+    volumeChangePct: 8,
+    lastEffectiveRir: 2,
+    rirInAllSessions: true,
+    topSetReps: 12,
+    loadUnit: 'kg',
+    ...overrides,
+  });
+
+const fatigue = (windowSize = 3): FatigueSignal =>
+  new FatigueSignal({ windowSize, volumeChangePct: -12, lastEffectiveRir: 5 });
+
+const regression = (windowSize = 3): RegressionSignal =>
+  new RegressionSignal({ windowSize, volumeChangePct: -9, lastEffectiveRir: 'unknown' });
+
+const stagnation = (): StagnationSignal =>
+  new StagnationSignal({ windowSize: 3, volumeChangePct: 0.5, topSetReps: 8, loadUnit: 'kg' });
 
 describe('ProposalValidator — rule (a): structural kind-action pairing', () => {
   const validator = new ProposalValidator();
@@ -92,6 +128,148 @@ describe('ProposalValidator — rule (a): structural kind-action pairing', () =>
       expect(violation.field).toBe('magnitude');
       expect(violation.expected).toBe(validKind);
       expect(violation.actual).toBe(magnitude.kind);
+    });
+  }
+});
+
+describe('ProposalValidator — rule (b): directional action-state coherence envelope', () => {
+  const validator = new ProposalValidator();
+
+  const states: {
+    state: string;
+    signals: PerformanceSignal[];
+    trend: Trend;
+    forbidden: DecisionAction[];
+  }[] = [
+    {
+      state: 'progress ∧ fatigue (contradiction, halt)',
+      signals: [progress(), fatigue()],
+      trend: Trend.Improving,
+      forbidden: ['increaseLoad', 'increaseReps'],
+    },
+    {
+      state: 'progress ∧ regression (contradiction, halt)',
+      signals: [progress(), regression()],
+      trend: Trend.Stable,
+      forbidden: ['increaseLoad', 'increaseReps'],
+    },
+    {
+      state: 'fatigue ∧ declining (decrease)',
+      signals: [fatigue()],
+      trend: Trend.Declining,
+      forbidden: ['increaseLoad', 'increaseReps'],
+    },
+    {
+      state: 'fatigue ∧ stable (decrease)',
+      signals: [fatigue()],
+      trend: Trend.Stable,
+      forbidden: ['increaseLoad', 'increaseReps'],
+    },
+    {
+      state: 'regression ∧ declining (decrease)',
+      signals: [regression()],
+      trend: Trend.Declining,
+      forbidden: ['increaseLoad', 'increaseReps'],
+    },
+    {
+      state: 'progress ∧ improving (increase)',
+      signals: [progress()],
+      trend: Trend.Improving,
+      forbidden: ['decreaseLoad', 'decreaseVolume'],
+    },
+    {
+      state: 'stagnation ∧ stable (increase)',
+      signals: [stagnation()],
+      trend: Trend.Stable,
+      forbidden: ['decreaseLoad', 'decreaseVolume'],
+    },
+  ];
+
+  for (const { state, signals, trend, forbidden } of states) {
+    for (const action of forbidden) {
+      it(`rejects ${action} as action_invalid_for_signal when ${state}`, () => {
+        const result = validator.validate(
+          proposal({ action, magnitude: MAGNITUDE_FOR[action] }),
+          evidence({ signals, trend }),
+        );
+
+        expect(result.status).toBe('rejected');
+        if (result.status !== 'rejected') {
+          return;
+        }
+        expect(result.violations).toHaveLength(1);
+        const violation = result.violations[0];
+        expect(violation.code).toBe('action_invalid_for_signal');
+        expect(violation.field).toBe('action');
+        expect(violation.actual).toBe(action);
+      });
+    }
+  }
+
+  const allowed: {
+    state: string;
+    signals: PerformanceSignal[];
+    trend: Trend;
+    action: DecisionAction;
+  }[] = [
+    {
+      state: 'progress ∧ fatigue (halt): conservative decrease stays allowed',
+      signals: [progress(), fatigue()],
+      trend: Trend.Improving,
+      action: 'decreaseLoad',
+    },
+    {
+      state: 'fatigue ∧ declining (decrease): same-direction alternative allowed',
+      signals: [fatigue()],
+      trend: Trend.Declining,
+      action: 'decreaseVolume',
+    },
+    {
+      state: 'fatigue ∧ stable (decrease): same-direction alternative allowed',
+      signals: [fatigue()],
+      trend: Trend.Stable,
+      action: 'decreaseLoad',
+    },
+    {
+      state: 'regression ∧ declining (decrease): same-direction alternative allowed',
+      signals: [regression()],
+      trend: Trend.Declining,
+      action: 'decreaseVolume',
+    },
+    {
+      state: 'progress ∧ improving (increase): same-direction alternative allowed',
+      signals: [progress()],
+      trend: Trend.Improving,
+      action: 'increaseReps',
+    },
+    {
+      state: 'stagnation ∧ stable (increase): load bump allowed though engine nudges reps',
+      signals: [stagnation()],
+      trend: Trend.Stable,
+      action: 'increaseLoad',
+    },
+    {
+      state: 'progress ∧ stable (neutral): nothing forbidden',
+      signals: [progress()],
+      trend: Trend.Stable,
+      action: 'decreaseLoad',
+    },
+    {
+      state: 'regression ∧ stable (neutral): nothing forbidden',
+      signals: [regression()],
+      trend: Trend.Stable,
+      action: 'increaseLoad',
+    },
+  ];
+
+  for (const { state, signals, trend, action } of allowed) {
+    it(`accepts ${action} when ${state}`, () => {
+      const result = validator.validate(
+        proposal({ action, magnitude: MAGNITUDE_FOR[action] }),
+        evidence({ signals, trend }),
+      );
+
+      expect(result.status).toBe('valid');
     });
   }
 });
