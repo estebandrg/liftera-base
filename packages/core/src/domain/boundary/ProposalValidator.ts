@@ -4,6 +4,7 @@ import { FatigueSignal } from '../signals/FatigueSignal.js';
 import { RegressionSignal } from '../signals/RegressionSignal.js';
 import { StagnationSignal } from '../signals/StagnationSignal.js';
 import { Trend } from '../value-objects/Trend.js';
+import { Confidence } from '../value-objects/Confidence.js';
 import { CoachEvidence } from './CoachEvidence.js';
 import { TrainingProposal } from './TrainingProposal.js';
 import { ValidationResult, Violation, ViolationCode } from './ValidationResult.js';
@@ -156,6 +157,38 @@ const REJECTING_CODES: ReadonlySet<ViolationCode> = new Set([
   'confidence_mismatch',
 ]);
 
+const CONFIDENCE_RANK: Record<Confidence, number> = {
+  insufficient: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+};
+
+// Rule (d): anti-overclaiming floor (Q4). The floor is the evidence window
+// confidence, elevated to high iff a medium window carries a ProgressSignal
+// with RIR in all sessions (mirrors the DecisionEngine confidence caps).
+// Proposals may only stay at or below the floor.
+const confidenceFloorViolations = ({ proposal, evidence }: ValidationInput): Violation[] => {
+  const progress = evidence.signals.find((s): s is ProgressSignal => s instanceof ProgressSignal);
+  const floor: Confidence =
+    evidence.windowConfidence === Confidence.Medium && progress?.evidence.rirInAllSessions === true
+      ? Confidence.High
+      : evidence.windowConfidence;
+
+  if (CONFIDENCE_RANK[proposal.confidence] <= CONFIDENCE_RANK[floor]) {
+    return [];
+  }
+  return [
+    {
+      code: 'confidence_mismatch',
+      message: `Proposal confidence '${proposal.confidence}' exceeds the deterministic confidence floor '${floor}'.`,
+      field: 'confidence',
+      expected: floor,
+      actual: proposal.confidence,
+    },
+  ];
+};
+
 /**
  * Universal authority boundary between ANY external actor and the domain:
  * no external actor can make effective a number the domain does not allow.
@@ -173,6 +206,7 @@ export class ProposalValidator {
     if (clamp) {
       violations.push(clamp.violation);
     }
+    violations.push(...confidenceFloorViolations(input));
 
     if (violations.some((violation) => REJECTING_CODES.has(violation.code))) {
       return { status: 'rejected', violations };

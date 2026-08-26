@@ -385,3 +385,90 @@ describe('ProposalValidator — rule (c): magnitude clamping to policy ceilings'
     });
   }
 });
+
+describe('ProposalValidator — rule (d): deterministic confidence floor', () => {
+  const validator = new ProposalValidator();
+
+  // maintain/none proposals isolate the floor from rules (a), (b) and (c).
+  const maintainWith = (confidence: Confidence): TrainingProposal =>
+    proposal({ action: 'maintain', magnitude: { kind: 'none' }, confidence });
+
+  it('rejects a confidence upgrade above the floor as confidence_mismatch', () => {
+    const result = validator.validate(
+      maintainWith(Confidence.High),
+      evidence({ windowConfidence: Confidence.Medium }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations).toHaveLength(1);
+    const violation = result.violations[0];
+    expect(violation.code).toBe('confidence_mismatch');
+    expect(violation.field).toBe('confidence');
+    expect(violation.expected).toBe(Confidence.Medium);
+    expect(violation.actual).toBe(Confidence.High);
+  });
+
+  it('rejects any rank above the floor, not just adjacent ones', () => {
+    const fromLow = validator.validate(
+      maintainWith(Confidence.Medium),
+      evidence({ windowConfidence: Confidence.Low }),
+    );
+    const fromInsufficient = validator.validate(
+      maintainWith(Confidence.Low),
+      evidence({ windowConfidence: Confidence.Insufficient }),
+    );
+
+    expect(fromLow.status).toBe('rejected');
+    expect(fromInsufficient.status).toBe('rejected');
+  });
+
+  it('accepts a confidence equal to the floor', () => {
+    const result = validator.validate(
+      maintainWith(Confidence.Medium),
+      evidence({ windowConfidence: Confidence.Medium }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('accepts a downgrade below the floor', () => {
+    const result = validator.validate(
+      maintainWith(Confidence.Medium),
+      evidence({ windowConfidence: Confidence.High }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('elevates a medium floor to high when progress has RIR in all sessions', () => {
+    const result = validator.validate(
+      maintainWith(Confidence.High),
+      evidence({
+        signals: [progress({ rirInAllSessions: true })],
+        windowConfidence: Confidence.Medium,
+      }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('does not elevate a medium floor without RIR in all sessions', () => {
+    const result = validator.validate(
+      maintainWith(Confidence.High),
+      evidence({
+        signals: [progress({ rirInAllSessions: false })],
+        windowConfidence: Confidence.Medium,
+      }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations[0].code).toBe('confidence_mismatch');
+    expect(result.violations[0].expected).toBe(Confidence.Medium);
+  });
+});
