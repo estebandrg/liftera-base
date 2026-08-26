@@ -13,6 +13,7 @@ import { Trend } from '../../domain/value-objects/Trend.js';
 import { Confidence } from '../../domain/value-objects/Confidence.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
 import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
+import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
 
 /**
  * In-memory fake of the history port (GoldenValidation pattern): async at
@@ -184,5 +185,35 @@ describe('EvidenceEngine — trend and signals', () => {
 
     expect(evidence.trend).toBe(Trend.Stable);
     expect(evidence.signals).toHaveLength(0);
+  });
+});
+
+describe('EvidenceEngine — policy limits', () => {
+  it('embeds policyLimits as the identical ProgressionPolicy reference', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [
+      topSetOnly(1, 60, 10, 3),
+      topSetOnly(2, 60, 11, 2),
+      topSetOnly(3, 60, 12, 2),
+    ]);
+    const engine = buildEngine(history);
+
+    const evidence = await engine.produceEvidence(benchPressId);
+
+    // Reference identity, not structural equality: the policy stays a single
+    // source of truth and drift between a copy and the const is impossible.
+    expect(evidence.policyLimits).toBe(ProgressionPolicy);
+    expect(evidence.policyLimits.LOAD_INCREMENT_KG).toBe(2.5);
+  });
+
+  it('reuses the same reference across calls instead of copying per evidence', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [topSetOnly(1, 100, 10, 2)]);
+    const engine = buildEngine(history);
+
+    const first = await engine.produceEvidence(benchPressId);
+    const second = await engine.produceEvidence(benchPressId);
+
+    expect(first.policyLimits).toBe(second.policyLimits);
   });
 });

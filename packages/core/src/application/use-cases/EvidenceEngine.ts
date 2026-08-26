@@ -38,7 +38,7 @@ export class EvidenceEngine {
       exerciseId,
       trend,
       signals,
-      policyLimits: { ...ProgressionPolicy },
+      policyLimits: ProgressionPolicy,
       windowConfidence: progression.windowConfidence(),
     };
   }
