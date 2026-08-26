@@ -6,7 +6,7 @@ import { StagnationSignal } from '../signals/StagnationSignal.js';
 import { Trend } from '../value-objects/Trend.js';
 import { CoachEvidence } from './CoachEvidence.js';
 import { TrainingProposal } from './TrainingProposal.js';
-import { ValidationResult, Violation } from './ValidationResult.js';
+import { ValidationResult, Violation, ViolationCode } from './ValidationResult.js';
 
 const EXPECTED_MAGNITUDE_KIND: Record<DecisionAction, DecisionMagnitude['kind']> = {
   increaseLoad: 'load',
@@ -79,6 +79,83 @@ const coherenceViolations = ({ proposal, evidence }: ValidationInput): Violation
   ];
 };
 
+interface MagnitudeClamp {
+  readonly magnitude: DecisionMagnitude;
+  readonly violation: Violation;
+}
+
+const clampTo = (
+  magnitude: DecisionMagnitude,
+  limit: number,
+  proposed: number,
+  action: DecisionAction,
+): MagnitudeClamp => ({
+  magnitude,
+  violation: {
+    code: 'magnitude_exceeds_limit',
+    message: `Magnitude ${proposed} for action '${action}' exceeds the policy limit ${limit}; clamped to the limit.`,
+    field: 'magnitude',
+    expected: limit,
+    actual: proposed,
+  },
+});
+
+// Rule (c): clamp magnitudes to the ProgressionPolicy ceilings carried by
+// the evidence. Only over-ceiling proposals are adjusted; conservative
+// under-limit proposals stay valid. Runs only on structurally matched
+// kind/action pairs — rule (a) owns mismatches.
+const magnitudeClamp = ({ proposal, evidence }: ValidationInput): MagnitudeClamp | undefined => {
+  const { action, magnitude } = proposal;
+  const limits = evidence.policyLimits;
+
+  if (action === 'increaseLoad' && magnitude.kind === 'load') {
+    const ceiling = magnitude.unit === 'kg' ? limits.LOAD_INCREMENT_KG : limits.LOAD_INCREMENT_LB;
+    if (magnitude.value > ceiling) {
+      return clampTo(
+        { kind: 'load', value: ceiling, unit: magnitude.unit },
+        ceiling,
+        magnitude.value,
+        action,
+      );
+    }
+    return undefined;
+  }
+  if (action === 'increaseReps' && magnitude.kind === 'reps') {
+    if (magnitude.value > limits.REP_INCREMENT) {
+      return clampTo(
+        { kind: 'reps', value: limits.REP_INCREMENT },
+        limits.REP_INCREMENT,
+        magnitude.value,
+        action,
+      );
+    }
+    return undefined;
+  }
+  if (action === 'decreaseLoad' && magnitude.kind === 'loadPercent') {
+    const floor = -limits.FATIGUE_LOAD_REDUCTION_PCT;
+    if (magnitude.percent < floor) {
+      return clampTo({ kind: 'loadPercent', percent: floor }, floor, magnitude.percent, action);
+    }
+    return undefined;
+  }
+  if (action === 'decreaseVolume' && magnitude.kind === 'sets') {
+    const floor = -limits.VOLUME_REDUCTION_SETS;
+    if (magnitude.value < floor) {
+      return clampTo({ kind: 'sets', value: floor }, floor, magnitude.value, action);
+    }
+    return undefined;
+  }
+  return undefined;
+};
+
+// Violation codes that reject the proposal outright; any other violation
+// (currently only magnitude_exceeds_limit) produces an adjustment instead.
+const REJECTING_CODES: ReadonlySet<ViolationCode> = new Set([
+  'policy_violation',
+  'action_invalid_for_signal',
+  'confidence_mismatch',
+]);
+
 /**
  * Universal authority boundary between ANY external actor and the domain:
  * no external actor can make effective a number the domain does not allow.
@@ -92,9 +169,16 @@ export class ProposalValidator {
       ...structuralPairingViolations(input),
       ...coherenceViolations(input),
     ];
+    const clamp = magnitudeClamp(input);
+    if (clamp) {
+      violations.push(clamp.violation);
+    }
 
-    if (violations.length > 0) {
+    if (violations.some((violation) => REJECTING_CODES.has(violation.code))) {
       return { status: 'rejected', violations };
+    }
+    if (clamp) {
+      return { status: 'adjusted', adjustedMagnitude: clamp.magnitude, violations };
     }
     return { status: 'valid' };
   }

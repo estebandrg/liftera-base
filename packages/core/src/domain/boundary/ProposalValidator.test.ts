@@ -273,3 +273,115 @@ describe('ProposalValidator — rule (b): directional action-state coherence env
     });
   }
 });
+
+describe('ProposalValidator — rule (c): magnitude clamping to policy ceilings', () => {
+  const validator = new ProposalValidator();
+
+  const overCeiling: {
+    action: DecisionAction;
+    proposed: DecisionMagnitude;
+    clamped: DecisionMagnitude;
+    limit: number;
+    proposedValue: number;
+  }[] = [
+    {
+      action: 'increaseLoad',
+      proposed: { kind: 'load', value: 5, unit: 'kg' },
+      clamped: { kind: 'load', value: 2.5, unit: 'kg' },
+      limit: 2.5,
+      proposedValue: 5,
+    },
+    {
+      action: 'increaseLoad',
+      proposed: { kind: 'load', value: 10, unit: 'lb' },
+      clamped: { kind: 'load', value: 5, unit: 'lb' },
+      limit: 5,
+      proposedValue: 10,
+    },
+    {
+      action: 'increaseReps',
+      proposed: { kind: 'reps', value: 3 },
+      clamped: { kind: 'reps', value: 1 },
+      limit: 1,
+      proposedValue: 3,
+    },
+    {
+      action: 'decreaseLoad',
+      proposed: { kind: 'loadPercent', percent: -25 },
+      clamped: { kind: 'loadPercent', percent: -10 },
+      limit: -10,
+      proposedValue: -25,
+    },
+    {
+      action: 'decreaseVolume',
+      proposed: { kind: 'sets', value: -3 },
+      clamped: { kind: 'sets', value: -1 },
+      limit: -1,
+      proposedValue: -3,
+    },
+  ];
+
+  for (const { action, proposed, clamped, limit, proposedValue } of overCeiling) {
+    it(`adjusts ${action} ${proposedValue} to the policy limit ${limit}`, () => {
+      const result = validator.validate(proposal({ action, magnitude: proposed }), evidence());
+
+      expect(result.status).toBe('adjusted');
+      if (result.status !== 'adjusted') {
+        return;
+      }
+      expect(result.adjustedMagnitude).toEqual(clamped);
+      expect(result.violations).toHaveLength(1);
+      const violation = result.violations[0];
+      expect(violation.code).toBe('magnitude_exceeds_limit');
+      expect(violation.field).toBe('magnitude');
+      expect(violation.expected).toBe(limit);
+      expect(violation.actual).toBe(proposedValue);
+    });
+  }
+
+  const withinLimits: { action: DecisionAction; magnitude: DecisionMagnitude; label: string }[] = [
+    {
+      action: 'increaseLoad',
+      magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+      label: 'at the kg ceiling',
+    },
+    {
+      action: 'increaseLoad',
+      magnitude: { kind: 'load', value: 1, unit: 'kg' },
+      label: 'under the kg ceiling',
+    },
+    {
+      action: 'increaseLoad',
+      magnitude: { kind: 'load', value: 5, unit: 'lb' },
+      label: 'at the lb ceiling',
+    },
+    {
+      action: 'increaseReps',
+      magnitude: { kind: 'reps', value: 1 },
+      label: 'at the rep ceiling',
+    },
+    {
+      action: 'decreaseLoad',
+      magnitude: { kind: 'loadPercent', percent: -10 },
+      label: 'at the reduction limit',
+    },
+    {
+      action: 'decreaseLoad',
+      magnitude: { kind: 'loadPercent', percent: -5 },
+      label: 'conservative under the reduction limit',
+    },
+    {
+      action: 'decreaseVolume',
+      magnitude: { kind: 'sets', value: -1 },
+      label: 'at the volume limit',
+    },
+  ];
+
+  for (const { action, magnitude, label } of withinLimits) {
+    it(`accepts ${action} ${label} as valid`, () => {
+      const result = validator.validate(proposal({ action, magnitude }), evidence());
+
+      expect(result.status).toBe('valid');
+    });
+  }
+});
