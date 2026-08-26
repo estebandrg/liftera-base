@@ -472,3 +472,73 @@ describe('ProposalValidator — rule (d): deterministic confidence floor', () =>
     expect(result.violations[0].expected).toBe(Confidence.Medium);
   });
 });
+
+describe('ProposalValidator — tri-state aggregation', () => {
+  const validator = new ProposalValidator();
+
+  it('rejection overrides a clamp: forbidden action plus over-ceiling magnitude', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 5, unit: 'kg' } }),
+      evidence({ signals: [fatigue()], trend: Trend.Declining }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const codes = result.violations.map((violation) => violation.code);
+    expect(codes).toContain('action_invalid_for_signal');
+    expect(codes).toContain('magnitude_exceeds_limit');
+    expect('adjustedMagnitude' in result).toBe(false);
+  });
+
+  it('rejection overrides a clamp: confidence upgrade plus over-ceiling magnitude', () => {
+    const result = validator.validate(
+      proposal({
+        action: 'increaseLoad',
+        magnitude: { kind: 'load', value: 5, unit: 'kg' },
+        confidence: Confidence.High,
+      }),
+      evidence({ windowConfidence: Confidence.Low }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const codes = result.violations.map((violation) => violation.code);
+    expect(codes).toContain('confidence_mismatch');
+    expect(codes).toContain('magnitude_exceeds_limit');
+    expect('adjustedMagnitude' in result).toBe(false);
+  });
+
+  it('structural mismatch rejects even with an extreme mismatched magnitude', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'reps', value: 10 } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const codes = result.violations.map((violation) => violation.code);
+    expect(codes).toContain('policy_violation');
+    expect('adjustedMagnitude' in result).toBe(false);
+  });
+
+  it('adjusted results carry their violations alongside the clamped magnitude', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 5, unit: 'kg' } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('adjusted');
+    if (result.status !== 'adjusted') {
+      return;
+    }
+    expect(result.adjustedMagnitude).toEqual({ kind: 'load', value: 2.5, unit: 'kg' });
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0].code).toBe('magnitude_exceeds_limit');
+  });
+});
