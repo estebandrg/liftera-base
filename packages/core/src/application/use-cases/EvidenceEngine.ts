@@ -1,10 +1,10 @@
 import { ExerciseHistoryRepository } from '../ports/ExerciseHistoryRepository.js';
 import { ExerciseNotFoundError } from '../../domain/errors/DomainErrors.js';
 import { ExerciseId } from '../../domain/exercise/ExerciseId.js';
+import { ExerciseProgression } from '../../domain/exercise/ExerciseProgression.js';
+import { Session } from '../../domain/exercise/Session.js';
 import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
-import { Trend } from '../../domain/value-objects/Trend.js';
-import { Confidence } from '../../domain/value-objects/Confidence.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
 
 /** Builds the use case once the consumer supplies a history port. */
@@ -30,12 +30,24 @@ export class EvidenceEngine {
       throw new ExerciseNotFoundError(exerciseId.toString());
     }
 
+    const sessions = await this.history.getRecentSessions(exerciseId, EvidenceEngine.WINDOW_SIZE);
+    const progression = new ExerciseProgression(this.chronological(sessions));
+    const { trend, signals } = this.trendAnalyzer.analyze(progression.sessions);
+
     return {
       exerciseId,
-      trend: Trend.Stable,
-      signals: [],
+      trend,
+      signals,
       policyLimits: { ...ProgressionPolicy },
-      windowConfidence: Confidence.Insufficient,
+      windowConfidence: progression.windowConfidence(),
     };
+  }
+
+  /**
+   * The port defines "recent", not order; the window invariant requires
+   * oldest-first. Normalizing here keeps the boundary honest.
+   */
+  private chronological(sessions: Session[]): Session[] {
+    return [...sessions].sort((a, b) => a.performedAt.getTime() - b.performedAt.getTime());
   }
 }
