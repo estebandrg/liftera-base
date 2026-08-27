@@ -1,16 +1,27 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { CoreCoachTools } from './CoreCoachTools.js';
 import { EvidenceEngine } from './use-cases/EvidenceEngine.js';
 import { ExerciseHistoryRepository } from './ports/ExerciseHistoryRepository.js';
-import { DomainInvariantError, PersistenceNotWiredError } from '../domain/errors/DomainErrors.js';
+import {
+  DomainInvariantError,
+  ExerciseNotFoundError,
+  PersistenceNotWiredError,
+} from '../domain/errors/DomainErrors.js';
+import { CoachEvidence } from '../domain/boundary/CoachEvidence.js';
 import { ProposalValidator } from '../domain/boundary/ProposalValidator.js';
 import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
 import { ValidationResult, ViolationCode } from '../domain/boundary/ValidationResult.js';
 import { Exercise } from '../domain/exercise/Exercise.js';
 import { ExerciseId } from '../domain/exercise/ExerciseId.js';
+import { LoggedSet } from '../domain/exercise/LoggedSet.js';
 import { Session } from '../domain/exercise/Session.js';
+import { ProgressionPolicy } from '../domain/recommendation/ProgressionPolicy.js';
 import { TrendAnalyzer } from '../domain/services/TrendAnalyzer.js';
 import { Confidence } from '../domain/value-objects/Confidence.js';
+import { Load } from '../domain/value-objects/Load.js';
+import { Reps } from '../domain/value-objects/Reps.js';
+import { RIR } from '../domain/value-objects/RIR.js';
+import { Trend } from '../domain/value-objects/Trend.js';
 
 /**
  * In-memory fake of the history port (RecommendNextSession.test.ts pattern).
@@ -41,6 +52,24 @@ class FakeExerciseHistoryRepository implements ExerciseHistoryRepository {
 }
 
 const benchPressId = new ExerciseId('Barbell Bench Press', 'Flat');
+
+const sessionOn = (day: number): Session =>
+  new Session(
+    [new LoggedSet(new Load(100, 'kg'), new Reps(10), new RIR(2))],
+    new Date(`2026-08-${day.toString().padStart(2, '0')}`),
+  );
+
+// Neutral evidence: no signals (no coherence restriction), stable trend,
+// high window confidence so a medium proposal confidence stays below the
+// floor. Tests override what they need (ProposalValidator.test.ts pattern).
+const evidence = (overrides: Partial<CoachEvidence> = {}): CoachEvidence => ({
+  exerciseId: benchPressId,
+  trend: Trend.Stable,
+  signals: [],
+  policyLimits: ProgressionPolicy,
+  windowConfidence: Confidence.High,
+  ...overrides,
+});
 
 const proposal = (overrides: Partial<TrainingProposal> = {}): TrainingProposal => ({
   source: 'ai',
@@ -80,12 +109,15 @@ const adjusted: ValidationResult = {
   ],
 };
 
-const buildTools = (history: ExerciseHistoryRepository): CoreCoachTools =>
-  new CoreCoachTools(new EvidenceEngine(history, new TrendAnalyzer()), new ProposalValidator());
+const buildTools = (history: ExerciseHistoryRepository) => {
+  const engine = new EvidenceEngine(history, new TrendAnalyzer());
+  const validator = new ProposalValidator();
+  return { tools: new CoreCoachTools(engine, validator), engine, validator };
+};
 
 describe('CoreCoachTools — applyRecommendation guard', () => {
   it('throws DomainInvariantError when the validation is rejected', async () => {
-    const tools = buildTools(new FakeExerciseHistoryRepository());
+    const { tools } = buildTools(new FakeExerciseHistoryRepository());
 
     await expect(
       tools.applyRecommendation(benchPressId, proposal(), rejected('policy_violation')),
@@ -93,7 +125,7 @@ describe('CoreCoachTools — applyRecommendation guard', () => {
   });
 
   it('guards any rejecting violation code and names the exercise', async () => {
-    const tools = buildTools(new FakeExerciseHistoryRepository());
+    const { tools } = buildTools(new FakeExerciseHistoryRepository());
 
     const apply = tools.applyRecommendation(
       benchPressId,
@@ -108,7 +140,7 @@ describe('CoreCoachTools — applyRecommendation guard', () => {
 
 describe('CoreCoachTools — applyRecommendation persistence (OQ-2)', () => {
   it('throws the typed persistence-not-wired error for a valid validation', async () => {
-    const tools = buildTools(new FakeExerciseHistoryRepository());
+    const { tools } = buildTools(new FakeExerciseHistoryRepository());
 
     const apply = tools.applyRecommendation(benchPressId, proposal(), valid);
 
@@ -117,10 +149,68 @@ describe('CoreCoachTools — applyRecommendation persistence (OQ-2)', () => {
   });
 
   it('lets an adjusted validation reach persistence — the guard fires only on rejected', async () => {
-    const tools = buildTools(new FakeExerciseHistoryRepository());
+    const { tools } = buildTools(new FakeExerciseHistoryRepository());
 
     const apply = tools.applyRecommendation(benchPressId, proposal(), adjusted);
 
     await expect(apply).rejects.toThrow(PersistenceNotWiredError);
+  });
+});
+
+describe('CoreCoachTools — getCoachEvidence delegation', () => {
+  it('returns the evidence the engine produces for the requested exercise', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [sessionOn(1)]);
+    const { tools, engine } = buildTools(history);
+    const produceSpy = vi.spyOn(engine, 'produceEvidence');
+
+    const result = await tools.getCoachEvidence(benchPressId);
+
+    expect(produceSpy).toHaveBeenCalledOnce();
+    expect(produceSpy).toHaveBeenCalledWith(benchPressId);
+    expect(result.exerciseId).toBe(benchPressId);
+    expect(result.policyLimits).toBe(ProgressionPolicy);
+    // One seeded session ⇒ insufficient window confidence: proves the real
+    // engine derivation flowed out, not a stubbed evidence literal.
+    expect(result.windowConfidence).toBe(Confidence.Insufficient);
+  });
+
+  it('surfaces ExerciseNotFoundError from the engine untouched', async () => {
+    const { tools } = buildTools(new FakeExerciseHistoryRepository());
+
+    await expect(tools.getCoachEvidence(benchPressId)).rejects.toThrow(ExerciseNotFoundError);
+  });
+});
+
+describe('CoreCoachTools — validateProposal delegation', () => {
+  it('returns the validator verdict for the given proposal and evidence', async () => {
+    const { tools, validator } = buildTools(new FakeExerciseHistoryRepository());
+    const validateSpy = vi.spyOn(validator, 'validate');
+    const overCeiling = proposal({ magnitude: { kind: 'load', value: 5, unit: 'kg' } });
+    const neutralEvidence = evidence();
+
+    const result = await tools.validateProposal(overCeiling, neutralEvidence);
+
+    expect(validateSpy).toHaveBeenCalledOnce();
+    expect(validateSpy).toHaveBeenCalledWith(overCeiling, neutralEvidence);
+    // Passthrough: the port returns exactly what the validator computes.
+    expect(result).toEqual(new ProposalValidator().validate(overCeiling, neutralEvidence));
+    expect(result.status).toBe('adjusted');
+  });
+
+  it('is pure and stateless: frozen inputs, repeatable result, no engine access', async () => {
+    const { tools, engine } = buildTools(new FakeExerciseHistoryRepository());
+    const produceSpy = vi.spyOn(engine, 'produceEvidence');
+    const frozenProposal = Object.freeze(proposal());
+    const frozenEvidence = Object.freeze(evidence());
+
+    const first = await tools.validateProposal(frozenProposal, frozenEvidence);
+    const second = await tools.validateProposal(frozenProposal, frozenEvidence);
+
+    // Frozen inputs throw on any mutation attempt (strict mode): reaching
+    // this line proves no side effect on the inputs.
+    expect(first).toEqual(second);
+    expect(first.status).toBe('valid');
+    expect(produceSpy).not.toHaveBeenCalled();
   });
 });
