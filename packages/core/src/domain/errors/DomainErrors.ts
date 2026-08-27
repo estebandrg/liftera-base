@@ -18,3 +18,10 @@ export class ExerciseNotFoundError extends Error {
     this.name = 'ExerciseNotFoundError';
   }
 }
+
+export class PersistenceNotWiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PersistenceNotWiredError';
+  }
+}

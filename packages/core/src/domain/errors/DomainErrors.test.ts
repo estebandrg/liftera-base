@@ -3,6 +3,7 @@ import {
   DomainInvariantError,
   BoundaryValidationError,
   ExerciseNotFoundError,
+  PersistenceNotWiredError,
 } from './DomainErrors.js';
 
 describe('DomainErrors', () => {
@@ -24,6 +25,13 @@ describe('DomainErrors', () => {
     const err = new ExerciseNotFoundError('bench-press');
     expect(err.name).toBe('ExerciseNotFoundError');
     expect(err.message).toBe('Exercise not found: bench-press');
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('PersistenceNotWiredError has correct name and message', () => {
+    const err = new PersistenceNotWiredError('Recommendation persistence is not wired in v0');
+    expect(err.name).toBe('PersistenceNotWiredError');
+    expect(err.message).toBe('Recommendation persistence is not wired in v0');
     expect(err).toBeInstanceOf(Error);
   });
 });

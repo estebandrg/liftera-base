@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CoreCoachTools } from './CoreCoachTools.js';
 import { EvidenceEngine } from './use-cases/EvidenceEngine.js';
 import { ExerciseHistoryRepository } from './ports/ExerciseHistoryRepository.js';
-import { DomainInvariantError } from '../domain/errors/DomainErrors.js';
+import { DomainInvariantError, PersistenceNotWiredError } from '../domain/errors/DomainErrors.js';
 import { ProposalValidator } from '../domain/boundary/ProposalValidator.js';
 import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
 import { ValidationResult, ViolationCode } from '../domain/boundary/ValidationResult.js';
@@ -64,6 +64,22 @@ const rejected = (code: ViolationCode): ValidationResult => ({
   violations: [{ code, message: `Rejected by ${code}.`, field: VIOLATION_FIELD[code] }],
 });
 
+const valid: ValidationResult = { status: 'valid' };
+
+const adjusted: ValidationResult = {
+  status: 'adjusted',
+  adjustedMagnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+  violations: [
+    {
+      code: 'magnitude_exceeds_limit',
+      message: 'Magnitude 5 exceeds the policy limit 2.5; clamped to the limit.',
+      field: 'magnitude',
+      expected: 2.5,
+      actual: 5,
+    },
+  ],
+};
+
 const buildTools = (history: ExerciseHistoryRepository): CoreCoachTools =>
   new CoreCoachTools(new EvidenceEngine(history, new TrendAnalyzer()), new ProposalValidator());
 
@@ -87,5 +103,24 @@ describe('CoreCoachTools — applyRecommendation guard', () => {
 
     await expect(apply).rejects.toThrow(DomainInvariantError);
     await expect(apply).rejects.toThrow('Barbell Bench Press (Flat)');
+  });
+});
+
+describe('CoreCoachTools — applyRecommendation persistence (OQ-2)', () => {
+  it('throws the typed persistence-not-wired error for a valid validation', async () => {
+    const tools = buildTools(new FakeExerciseHistoryRepository());
+
+    const apply = tools.applyRecommendation(benchPressId, proposal(), valid);
+
+    await expect(apply).rejects.toThrow(PersistenceNotWiredError);
+    await expect(apply).rejects.toThrow('Recommendation persistence is not wired');
+  });
+
+  it('lets an adjusted validation reach persistence — the guard fires only on rejected', async () => {
+    const tools = buildTools(new FakeExerciseHistoryRepository());
+
+    const apply = tools.applyRecommendation(benchPressId, proposal(), adjusted);
+
+    await expect(apply).rejects.toThrow(PersistenceNotWiredError);
   });
 });
