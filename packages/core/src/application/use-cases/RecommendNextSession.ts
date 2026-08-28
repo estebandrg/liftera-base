@@ -7,6 +7,7 @@ import { Recommendation } from '../../domain/recommendation/Recommendation.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
 import { DecisionEngine } from '../../domain/services/DecisionEngine.js';
 import { RecommendationEngine } from '../../domain/services/RecommendationEngine.js';
+import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 
 /** Builds a use case once the consumer supplies a history port. */
 export type RecommendNextSessionFactory = (
@@ -21,7 +22,7 @@ export type RecommendNextSessionFactory = (
  */
 export class RecommendNextSession {
   /** Sessions analyzed per recommendation — the progression window size. */
-  static readonly WINDOW_SIZE = 3;
+  static readonly WINDOW_SIZE = PROGRESSION_WINDOW_SIZE;
 
   constructor(
     private readonly history: ExerciseHistoryRepository,

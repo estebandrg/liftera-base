@@ -6,6 +6,7 @@ import { Session } from '../../domain/exercise/Session.js';
 import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 
 /** Builds the use case once the consumer supplies a history port. */
 export type EvidenceEngineFactory = (history: ExerciseHistoryRepository) => EvidenceEngine;
@@ -17,7 +18,7 @@ export type EvidenceEngineFactory = (history: ExerciseHistoryRepository) => Evid
  */
 export class EvidenceEngine {
   /** Sessions analyzed per evidence — the progression window size. */
-  static readonly WINDOW_SIZE = 3;
+  static readonly WINDOW_SIZE = PROGRESSION_WINDOW_SIZE;
 
   constructor(
     private readonly history: ExerciseHistoryRepository,

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { EvidenceEngine } from './EvidenceEngine.js';
+import { RecommendNextSession } from './RecommendNextSession.js';
+import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 import { ExerciseHistoryRepository } from '../ports/ExerciseHistoryRepository.js';
 import { ExerciseNotFoundError } from '../../domain/errors/DomainErrors.js';
 import { Exercise } from '../../domain/exercise/Exercise.js';
@@ -215,5 +217,13 @@ describe('EvidenceEngine — policy limits', () => {
     const second = await engine.produceEvidence(benchPressId);
 
     expect(first.policyLimits).toBe(second.policyLimits);
+  });
+});
+
+describe('EvidenceEngine — window size consistency', () => {
+  it('sources its window from the same progression window constant as RecommendNextSession', () => {
+    expect(EvidenceEngine.WINDOW_SIZE).toBe(PROGRESSION_WINDOW_SIZE);
+    expect(RecommendNextSession.WINDOW_SIZE).toBe(PROGRESSION_WINDOW_SIZE);
+    expect(EvidenceEngine.WINDOW_SIZE).toBe(RecommendNextSession.WINDOW_SIZE);
   });
 });
