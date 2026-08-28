@@ -6,6 +6,9 @@ import {
   RecommendNextSession,
   RecommendNextSessionFactory,
 } from '../application/use-cases/RecommendNextSession.js';
+import { EvidenceEngine, EvidenceEngineFactory } from '../application/use-cases/EvidenceEngine.js';
+import { CoreCoachTools, CoachToolsFactory } from '../application/CoreCoachTools.js';
+import { ProposalValidator } from '../domain/boundary/ProposalValidator.js';
 
 export class DIContainer {
   private registry = new Map<string, unknown>();
@@ -24,9 +27,10 @@ export class DIContainer {
 }
 
 /**
- * String tokens for the core decision-cycle registrations. The history
- * port is consumer-supplied, so the use case is registered as a factory
- * that closes over the container's pipeline services.
+ * String tokens for the core decision-cycle and coach-boundary
+ * registrations. The history port is consumer-supplied, so use cases and
+ * coach tools are registered as factories that close over the container's
+ * pipeline services.
  */
 export const CoreTokens = {
   sessionInterpreter: 'core.sessionInterpreter',
@@ -34,6 +38,9 @@ export const CoreTokens = {
   decisionEngine: 'core.decisionEngine',
   recommendationEngine: 'core.recommendationEngine',
   recommendNextSession: 'core.recommendNextSession',
+  proposalValidator: 'core.proposalValidator',
+  evidenceEngine: 'core.evidenceEngine',
+  coachTools: 'core.coachTools',
 } as const;
 
 export const container = new DIContainer();
@@ -51,3 +58,16 @@ const recommendNextSessionFactory: RecommendNextSessionFactory = (history) =>
     container.resolve<RecommendationEngine>(CoreTokens.recommendationEngine),
   );
 container.register(CoreTokens.recommendNextSession, recommendNextSessionFactory);
+
+container.register(CoreTokens.proposalValidator, new ProposalValidator());
+
+const evidenceEngineFactory: EvidenceEngineFactory = (history) =>
+  new EvidenceEngine(history, container.resolve<TrendAnalyzer>(CoreTokens.trendAnalyzer));
+container.register(CoreTokens.evidenceEngine, evidenceEngineFactory);
+
+const coachToolsFactory: CoachToolsFactory = (history) =>
+  new CoreCoachTools(
+    container.resolve<EvidenceEngineFactory>(CoreTokens.evidenceEngine)(history),
+    container.resolve<ProposalValidator>(CoreTokens.proposalValidator),
+  );
+container.register(CoreTokens.coachTools, coachToolsFactory);

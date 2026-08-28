@@ -1,12 +1,15 @@
 // Composition root
 export { container, DIContainer, CoreTokens } from './di/container.js';
 
-// Application: the use case and its outbound port
+// Application: the use cases, tool port, and their outbound port
 export {
   RecommendNextSession,
   RecommendNextSessionFactory,
 } from './application/use-cases/RecommendNextSession.js';
+export { EvidenceEngine, EvidenceEngineFactory } from './application/use-cases/EvidenceEngine.js';
 export { ExerciseHistoryRepository } from './application/ports/ExerciseHistoryRepository.js';
+export { CoachTools } from './application/ports/CoachTools.js';
+export { CoreCoachTools, CoachToolsFactory } from './application/CoreCoachTools.js';
 
 // Boundary: snapshot schema, mappers, and wire types (sole Zod site)
 export {
@@ -20,6 +23,49 @@ export {
   RecommendationSnapshotMapper,
   RecommendationSnapshot,
 } from './infrastructure/mappers/RecommendationSnapshotMapper.js';
+export {
+  DecisionMagnitudeSchema,
+  DecisionMagnitudeSnapshot,
+  TrainingProposalSchema,
+  TrainingProposalSnapshot,
+  TrainingProposalMapper,
+} from './infrastructure/mappers/TrainingProposalSchema.js';
+export {
+  LastEffectiveRirSnapshotSchema,
+  ProgressSignalSnapshotSchema,
+  FatigueSignalSnapshotSchema,
+  RegressionSignalSnapshotSchema,
+  StagnationSignalSnapshotSchema,
+  SignalSnapshotSchema,
+  SignalSnapshot,
+  PolicyLimitsSnapshotSchema,
+  PolicyLimitsSnapshot,
+  CoachEvidenceSnapshotSchema,
+  CoachEvidenceSnapshot,
+  CoachEvidenceSnapshotMapper,
+} from './infrastructure/mappers/CoachEvidenceSnapshot.js';
+export {
+  ViolationSnapshotSchema,
+  ViolationSnapshot,
+  ValidationResultSnapshotSchema,
+  ValidationResultSnapshot,
+  ValidationResultSnapshotMapper,
+} from './infrastructure/mappers/ValidationResultSnapshot.js';
+
+// Boundary domain: the contracts every external actor flows through
+export { CoachEvidence } from './domain/boundary/CoachEvidence.js';
+export {
+  TrainingProposal,
+  ProposalSource,
+  ProposalIntent,
+} from './domain/boundary/TrainingProposal.js';
+export {
+  ValidationResult,
+  Violation,
+  ViolationCode,
+  AppliedRecommendation,
+} from './domain/boundary/ValidationResult.js';
+export { ProposalValidator } from './domain/boundary/ProposalValidator.js';
 
 // Domain surface a consumer needs to implement the port and read results
 export { Exercise } from './domain/exercise/Exercise.js';
@@ -42,4 +88,5 @@ export {
   DomainInvariantError,
   BoundaryValidationError,
   ExerciseNotFoundError,
+  PersistenceNotWiredError,
 } from './domain/errors/DomainErrors.js';
