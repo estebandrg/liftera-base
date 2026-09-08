@@ -5,7 +5,10 @@ import { CoachEvidence } from './domain/boundary/CoachEvidence.js';
 import { TrainingProposal } from './domain/boundary/TrainingProposal.js';
 import { ValidationResult } from './domain/boundary/ValidationResult.js';
 import { EvidenceEngine } from './application/use-cases/EvidenceEngine.js';
+import { RunProgressionCycle } from './application/use-cases/RunProgressionCycle.js';
+import { InMemoryRecommendationSink } from './application/ports/InMemoryRecommendationSink.js';
 import { CoreCoachTools } from './application/CoreCoachTools.js';
+import { ProgressionEngine } from './domain/services/ProgressionEngine.js';
 import { PersistenceNotWiredError } from './domain/errors/DomainErrors.js';
 import {
   DecisionMagnitudeSchema,
@@ -41,7 +44,10 @@ describe('package surface — boundary value exports', () => {
   it('re-exports the boundary domain and application implementations unchanged', () => {
     expect(surface.ProposalValidator).toBe(ProposalValidator);
     expect(surface.EvidenceEngine).toBe(EvidenceEngine);
+    expect(surface.RunProgressionCycle).toBe(RunProgressionCycle);
+    expect(surface.InMemoryRecommendationSink).toBe(InMemoryRecommendationSink);
     expect(surface.CoreCoachTools).toBe(CoreCoachTools);
+    expect(surface.ProgressionEngine).toBe(ProgressionEngine);
     expect(surface.PersistenceNotWiredError).toBe(PersistenceNotWiredError);
   });
 

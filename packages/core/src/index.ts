@@ -7,8 +7,14 @@ export {
   RecommendNextSessionFactory,
 } from './application/use-cases/RecommendNextSession.js';
 export { EvidenceEngine, EvidenceEngineFactory } from './application/use-cases/EvidenceEngine.js';
+export {
+  RunProgressionCycle,
+  RunProgressionCycleResult,
+} from './application/use-cases/RunProgressionCycle.js';
 export { ExerciseHistoryRepository } from './application/ports/ExerciseHistoryRepository.js';
 export { CoachTools } from './application/ports/CoachTools.js';
+export { RecommendationSink } from './application/ports/RecommendationSink.js';
+export { InMemoryRecommendationSink } from './application/ports/InMemoryRecommendationSink.js';
 export { CoreCoachTools, CoachToolsFactory } from './application/CoreCoachTools.js';
 
 // Boundary: snapshot schema, mappers, and wire types (sole Zod site)
@@ -66,6 +72,7 @@ export {
   AppliedRecommendation,
 } from './domain/boundary/ValidationResult.js';
 export { ProposalValidator } from './domain/boundary/ProposalValidator.js';
+export { ProgressionEngine } from './domain/services/ProgressionEngine.js';
 
 // Domain surface a consumer needs to implement the port and read results
 export { Exercise } from './domain/exercise/Exercise.js';
