@@ -2,11 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { CoreCoachTools } from './CoreCoachTools.js';
 import { EvidenceEngine } from './use-cases/EvidenceEngine.js';
 import { ExerciseHistoryRepository } from './ports/ExerciseHistoryRepository.js';
-import {
-  DomainInvariantError,
-  ExerciseNotFoundError,
-  PersistenceNotWiredError,
-} from '../domain/errors/DomainErrors.js';
+import { InMemoryRecommendationSink } from './ports/InMemoryRecommendationSink.js';
+import { DomainInvariantError, ExerciseNotFoundError } from '../domain/errors/DomainErrors.js';
 import { CoachEvidence } from '../domain/boundary/CoachEvidence.js';
 import { ProposalValidator } from '../domain/boundary/ProposalValidator.js';
 import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
@@ -109,10 +106,10 @@ const adjusted: ValidationResult = {
   ],
 };
 
-const buildTools = (history: ExerciseHistoryRepository) => {
+const buildTools = (history: ExerciseHistoryRepository, sink?: InMemoryRecommendationSink) => {
   const engine = new EvidenceEngine(history, new TrendAnalyzer());
   const validator = new ProposalValidator();
-  return { tools: new CoreCoachTools(engine, validator), engine, validator };
+  return { tools: new CoreCoachTools(engine, validator, sink), engine, validator };
 };
 
 describe('CoreCoachTools — applyRecommendation guard', () => {
@@ -138,22 +135,58 @@ describe('CoreCoachTools — applyRecommendation guard', () => {
   });
 });
 
-describe('CoreCoachTools — applyRecommendation persistence (OQ-2)', () => {
-  it('throws the typed persistence-not-wired error for a valid validation', async () => {
-    const { tools } = buildTools(new FakeExerciseHistoryRepository());
+describe('CoreCoachTools — applyRecommendation sink recording', () => {
+  it('records a valid validation through the injected sink', async () => {
+    const sink = new InMemoryRecommendationSink();
+    const { tools } = buildTools(new FakeExerciseHistoryRepository(), sink);
+    const p = proposal();
 
-    const apply = tools.applyRecommendation(benchPressId, proposal(), valid);
+    await tools.applyRecommendation(benchPressId, p, valid);
 
-    await expect(apply).rejects.toThrow(PersistenceNotWiredError);
-    await expect(apply).rejects.toThrow('Recommendation persistence is not wired');
+    expect(sink.records).toHaveLength(1);
+    expect(sink.records[0].exerciseId).toBe(benchPressId);
+    expect(sink.records[0].proposal).toEqual(p);
+    expect(sink.records[0].validation).toEqual(valid);
+    expect(sink.records[0].appliedAt).toBeInstanceOf(Date);
   });
 
-  it('lets an adjusted validation reach persistence — the guard fires only on rejected', async () => {
+  it('records an adjusted validation preserving the full trace', async () => {
+    const sink = new InMemoryRecommendationSink();
+    const { tools } = buildTools(new FakeExerciseHistoryRepository(), sink);
+    const p = proposal();
+
+    await tools.applyRecommendation(benchPressId, p, adjusted);
+
+    expect(sink.records).toHaveLength(1);
+    expect(sink.records[0].proposal).toEqual(p);
+    expect(sink.records[0].validation).toEqual(adjusted);
+    if (sink.records[0].validation.status === 'adjusted') {
+      expect(sink.records[0].validation.adjustedMagnitude).toEqual({
+        kind: 'load',
+        value: 2.5,
+        unit: 'kg',
+      });
+      expect(sink.records[0].validation.violations[0].code).toBe('magnitude_exceeds_limit');
+    }
+  });
+
+  it('does NOT record when the validation is rejected', async () => {
+    const sink = new InMemoryRecommendationSink();
+    const { tools } = buildTools(new FakeExerciseHistoryRepository(), sink);
+
+    await expect(
+      tools.applyRecommendation(benchPressId, proposal(), rejected('policy_violation')),
+    ).rejects.toThrow(DomainInvariantError);
+
+    expect(sink.records).toHaveLength(0);
+  });
+
+  it('resolves silently when no sink is injected (backward compatibility)', async () => {
     const { tools } = buildTools(new FakeExerciseHistoryRepository());
 
-    const apply = tools.applyRecommendation(benchPressId, proposal(), adjusted);
-
-    await expect(apply).rejects.toThrow(PersistenceNotWiredError);
+    await expect(
+      tools.applyRecommendation(benchPressId, proposal(), valid),
+    ).resolves.toBeUndefined();
   });
 });
 

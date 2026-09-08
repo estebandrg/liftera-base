@@ -1,11 +1,12 @@
 import { CoachTools } from './ports/CoachTools.js';
 import { EvidenceEngine } from './use-cases/EvidenceEngine.js';
 import { ExerciseHistoryRepository } from './ports/ExerciseHistoryRepository.js';
+import { RecommendationSink } from './ports/RecommendationSink.js';
 import { CoachEvidence } from '../domain/boundary/CoachEvidence.js';
 import { ProposalValidator } from '../domain/boundary/ProposalValidator.js';
 import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
-import { ValidationResult } from '../domain/boundary/ValidationResult.js';
-import { DomainInvariantError, PersistenceNotWiredError } from '../domain/errors/DomainErrors.js';
+import { ValidationResult, AppliedRecommendation } from '../domain/boundary/ValidationResult.js';
+import { DomainInvariantError } from '../domain/errors/DomainErrors.js';
 import { ExerciseId } from '../domain/exercise/ExerciseId.js';
 
 /** Builds the tools once the consumer supplies a history port. */
@@ -20,6 +21,7 @@ export class CoreCoachTools implements CoachTools {
   constructor(
     private readonly evidenceEngine: EvidenceEngine,
     private readonly validator: ProposalValidator,
+    private readonly sink?: RecommendationSink,
   ) {}
 
   getCoachEvidence(exerciseId: ExerciseId): Promise<CoachEvidence> {
@@ -37,13 +39,11 @@ export class CoreCoachTools implements CoachTools {
   /**
    * Applying a REJECTED validation is a caller bug, not a domain outcome:
    * the guard fires before any persistence concern. Applicable validations
-   * (valid or adjusted) then hit the v0 boundary: persistence is not wired
-   * yet (OQ-2), so the call fails loudly with a typed error instead of
-   * silently dropping the proposal.
+   * (valid or adjusted) are recorded through the injected sink when wired.
    */
   async applyRecommendation(
     exerciseId: ExerciseId,
-    _proposal: TrainingProposal,
+    proposal: TrainingProposal,
     validation: ValidationResult,
   ): Promise<void> {
     if (validation.status === 'rejected') {
@@ -51,8 +51,14 @@ export class CoreCoachTools implements CoachTools {
         `Cannot apply a rejected recommendation for exercise ${exerciseId.toString()}.`,
       );
     }
-    throw new PersistenceNotWiredError(
-      'Recommendation persistence is not wired in boundary v0 (OQ-2).',
-    );
+    if (this.sink) {
+      const applied: AppliedRecommendation = {
+        exerciseId,
+        proposal,
+        validation,
+        appliedAt: new Date(),
+      };
+      await this.sink.record(applied);
+    }
   }
 }
