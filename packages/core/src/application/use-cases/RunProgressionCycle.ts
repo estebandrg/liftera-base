@@ -1,9 +1,9 @@
-import { CoachTools } from '../application/ports/CoachTools.js';
-import { ExerciseHistoryRepository } from '../application/ports/ExerciseHistoryRepository.js';
-import { ExerciseId } from '../domain/exercise/ExerciseId.js';
-import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
-import { ValidationResult } from '../domain/boundary/ValidationResult.js';
-import { AIMock } from '../test-support/AIMock.js';
+import { CoachTools } from '../ports/CoachTools.js';
+import { ExerciseHistoryRepository } from '../ports/ExerciseHistoryRepository.js';
+import { ExerciseId } from '../../domain/exercise/ExerciseId.js';
+import { TrainingProposal } from '../../domain/boundary/TrainingProposal.js';
+import { ValidationResult } from '../../domain/boundary/ValidationResult.js';
+import { AIMock } from '../../test-support/AIMock.js';
 
 export type RunProgressionCycleResult =
   | {
