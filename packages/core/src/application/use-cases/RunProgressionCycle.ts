@@ -3,7 +3,7 @@ import { ExerciseHistoryRepository } from '../ports/ExerciseHistoryRepository.js
 import { ExerciseId } from '../../domain/exercise/ExerciseId.js';
 import { TrainingProposal } from '../../domain/boundary/TrainingProposal.js';
 import { ValidationResult } from '../../domain/boundary/ValidationResult.js';
-import { AIMock } from '../../test-support/AIMock.js';
+import { ProposalGenerator } from '../ports/ProposalGenerator.js';
 
 export type RunProgressionCycleResult =
   | {
@@ -24,12 +24,12 @@ export class RunProgressionCycle {
   constructor(
     private readonly history: ExerciseHistoryRepository,
     private readonly tools: CoachTools,
-    private readonly aiMock: AIMock,
+    private readonly proposalSource: ProposalGenerator,
   ) {}
 
   async execute(exerciseId: ExerciseId): Promise<RunProgressionCycleResult> {
     const evidence = await this.tools.getCoachEvidence(exerciseId);
-    const proposal = this.aiMock.propose(evidence);
+    const proposal = this.proposalSource.propose(evidence);
     const validation = await this.tools.validateProposal(proposal, evidence);
 
     if (validation.status === 'rejected') {

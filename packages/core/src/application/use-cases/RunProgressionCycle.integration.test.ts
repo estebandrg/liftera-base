@@ -4,7 +4,8 @@ import { CoreCoachTools } from '../CoreCoachTools.js';
 import { EvidenceEngine } from './EvidenceEngine.js';
 import { ExerciseHistoryRepository } from '../ports/ExerciseHistoryRepository.js';
 import { InMemoryRecommendationSink } from '../ports/InMemoryRecommendationSink.js';
-import { AIMock, AIMockRule } from '../../test-support/AIMock.js';
+import { AIMock } from '../../test-support/AIMock.js';
+import { ProposalGenerator } from '../ports/ProposalGenerator.js';
 import { Exercise } from '../../domain/exercise/Exercise.js';
 import { ExerciseId } from '../../domain/exercise/ExerciseId.js';
 import { Session } from '../../domain/exercise/Session.js';
@@ -15,6 +16,7 @@ import { RIR } from '../../domain/value-objects/RIR.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
 import { ProposalValidator } from '../../domain/boundary/ProposalValidator.js';
 import { Confidence } from '../../domain/value-objects/Confidence.js';
+import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
 
 class FakeExerciseHistoryRepository implements ExerciseHistoryRepository {
   private readonly exercises = new Map<string, Exercise>();
@@ -54,14 +56,76 @@ const sessionOn = (day: number, kg: number, reps: number, rir?: number): Session
     new Date(`2026-08-${day.toString().padStart(2, '0')}`),
   );
 
-const buildCycle = (history: FakeExerciseHistoryRepository, rules: AIMockRule[]) => {
+const buildCycle = (history: FakeExerciseHistoryRepository, proposalSource: ProposalGenerator) => {
   const sink = new InMemoryRecommendationSink();
   const engine = new EvidenceEngine(history, new TrendAnalyzer());
   const validator = new ProposalValidator();
   const tools = new CoreCoachTools(engine, validator, sink);
-  const aiMock = new AIMock(rules);
-  return { cycle: new RunProgressionCycle(history, tools, aiMock), sink };
+  return { cycle: new RunProgressionCycle(history, tools, proposalSource), sink };
 };
+
+describe('RunProgressionCycle — evidence flow', () => {
+  it('populates evidenceAt and completeness=full when RIR is in all sessions', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [
+      sessionOn(1, 100, 10, 3),
+      sessionOn(2, 100, 11, 2),
+      sessionOn(3, 100, 12, 2),
+    ]);
+
+    let capturedEvidence: CoachEvidence | undefined;
+    const capturingSource: ProposalGenerator = {
+      propose: (evidence) => {
+        capturedEvidence = evidence;
+        return {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+          justification: 'Capture.',
+          confidence: Confidence.Medium,
+        };
+      },
+    };
+
+    const { cycle } = buildCycle(history, capturingSource);
+    await cycle.execute(benchPressId);
+
+    expect(capturedEvidence).toBeDefined();
+    expect(capturedEvidence!.evidenceAt).toBeInstanceOf(Date);
+    expect(capturedEvidence!.completeness).toBe('full');
+  });
+
+  it('populates completeness=partial when RIR is missing in some sessions', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [
+      sessionOn(1, 100, 10, 3),
+      sessionOn(2, 100, 11), // no RIR
+      sessionOn(3, 100, 12, 2),
+    ]);
+
+    let capturedEvidence: CoachEvidence | undefined;
+    const capturingSource: ProposalGenerator = {
+      propose: (evidence) => {
+        capturedEvidence = evidence;
+        return {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+          justification: 'Capture.',
+          confidence: Confidence.Medium,
+        };
+      },
+    };
+
+    const { cycle } = buildCycle(history, capturingSource);
+    await cycle.execute(benchPressId);
+
+    expect(capturedEvidence).toBeDefined();
+    expect(capturedEvidence!.completeness).toBe('partial');
+  });
+});
 
 describe('RunProgressionCycle — happy path', () => {
   it('applies a valid proposal and records it in the sink', async () => {
@@ -73,20 +137,22 @@ describe('RunProgressionCycle — happy path', () => {
       sessionOn(3, 100, 12, 2),
     ]);
 
-    const rule: AIMockRule = {
-      match: (evidence) =>
-        evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
-      proposal: {
-        source: 'ai',
-        intent: 'progress',
-        action: 'increaseLoad',
-        magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
-        justification: 'Happy path proposal.',
-        confidence: Confidence.Medium,
+    const proposalSource: ProposalGenerator = new AIMock([
+      {
+        match: (evidence) =>
+          evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
+        proposal: {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+          justification: 'Happy path proposal.',
+          confidence: Confidence.Medium,
+        },
       },
-    };
+    ]);
 
-    const { cycle, sink } = buildCycle(history, [rule]);
+    const { cycle, sink } = buildCycle(history, proposalSource);
 
     const result = await cycle.execute(benchPressId);
 
@@ -114,20 +180,22 @@ describe('RunProgressionCycle — barbarity cases', () => {
       sessionOn(3, 100, 12, 2),
     ]);
 
-    const rule: AIMockRule = {
-      match: (evidence) =>
-        evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
-      proposal: {
-        source: 'ai',
-        intent: 'progress',
-        action: 'increaseLoad',
-        magnitude: { kind: 'load', value: 50, unit: 'kg' },
-        justification: 'Excessive magnitude.',
-        confidence: Confidence.Medium,
+    const proposalSource: ProposalGenerator = new AIMock([
+      {
+        match: (evidence) =>
+          evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
+        proposal: {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 50, unit: 'kg' },
+          justification: 'Excessive magnitude.',
+          confidence: Confidence.Medium,
+        },
       },
-    };
+    ]);
 
-    const { cycle, sink } = buildCycle(history, [rule]);
+    const { cycle, sink } = buildCycle(history, proposalSource);
 
     const result = await cycle.execute(benchPressId);
 
@@ -165,19 +233,21 @@ describe('RunProgressionCycle — barbarity cases', () => {
       sessionOn(3, 100, 8, 5),
     ]);
 
-    const rule: AIMockRule = {
-      match: (evidence) => evidence.signals.some((s) => s.kind === 'fatigue'),
-      proposal: {
-        source: 'ai',
-        intent: 'progress',
-        action: 'increaseLoad',
-        magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
-        justification: 'Opposite direction.',
-        confidence: Confidence.Medium,
+    const proposalSource: ProposalGenerator = new AIMock([
+      {
+        match: (evidence) => evidence.signals.some((s) => s.kind === 'fatigue'),
+        proposal: {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+          justification: 'Opposite direction.',
+          confidence: Confidence.Medium,
+        },
       },
-    };
+    ]);
 
-    const { cycle, sink } = buildCycle(history, [rule]);
+    const { cycle, sink } = buildCycle(history, proposalSource);
 
     const result = await cycle.execute(benchPressId);
 
@@ -199,20 +269,22 @@ describe('RunProgressionCycle — barbarity cases', () => {
       sessionOn(3, 100, 12, 2),
     ]);
 
-    const rule: AIMockRule = {
-      match: (evidence) =>
-        evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
-      proposal: {
-        source: 'ai',
-        intent: 'progress',
-        action: 'increaseLoad',
-        magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
-        justification: 'Overclaimed confidence.',
-        confidence: Confidence.High,
+    const proposalSource: ProposalGenerator = new AIMock([
+      {
+        match: (evidence) =>
+          evidence.trend === 'improving' && evidence.signals.some((s) => s.kind === 'progress'),
+        proposal: {
+          source: 'ai',
+          intent: 'progress',
+          action: 'increaseLoad',
+          magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+          justification: 'Overclaimed confidence.',
+          confidence: Confidence.High,
+        },
       },
-    };
+    ]);
 
-    const { cycle, sink } = buildCycle(history, [rule]);
+    const { cycle, sink } = buildCycle(history, proposalSource);
 
     const result = await cycle.execute(benchPressId);
 

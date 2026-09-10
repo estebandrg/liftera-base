@@ -35,12 +35,16 @@ export class EvidenceEngine {
     const progression = new ExerciseProgression(this.chronological(sessions));
     const { trend, signals } = this.trendAnalyzer.analyze(progression.sessions);
 
+    const progress = signals.find((s) => s.kind === 'progress');
+
     return {
       exerciseId,
       trend,
       signals,
       policyLimits: ProgressionPolicy,
       windowConfidence: progression.windowConfidence(),
+      evidenceAt: new Date(),
+      completeness: progress?.evidence.rirInAllSessions === true ? 'full' : 'partial',
     };
   }
 
