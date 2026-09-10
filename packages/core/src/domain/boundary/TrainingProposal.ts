@@ -6,6 +6,12 @@ export type ProposalSource = 'ai' | 'user' | 'system' | 'external';
 export type ProposalIntent =
   'progress' | 'conservative_progress' | 'deload' | 'maintain' | 'evaluate_change';
 
+export interface ProposalProvenance {
+  readonly source: ProposalSource;
+  readonly intent: ProposalIntent;
+  readonly evidenceRefs: readonly string[];
+}
+
 /**
  * An absolute-magnitude proposal from ANY external actor (AI, user, system,
  * external import). The core is the authority over what is VALID, not over
@@ -18,4 +24,5 @@ export interface TrainingProposal {
   readonly magnitude: DecisionMagnitude;
   readonly justification: string;
   readonly confidence: Confidence;
+  readonly provenance?: ProposalProvenance;
 }

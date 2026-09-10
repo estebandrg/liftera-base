@@ -15,6 +15,9 @@ import {
   TrainingProposalSchema,
   TrainingProposalMapper,
 } from './infrastructure/mappers/TrainingProposalSchema.js';
+// ProposalGenerator is type-only; runtime assertion uses surface.ProposalGenerator.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { ProposalGenerator } from './application/ports/ProposalGenerator.js';
 import {
   LastEffectiveRirSnapshotSchema,
   ProgressSignalSnapshotSchema,
@@ -49,6 +52,23 @@ describe('package surface — boundary value exports', () => {
     expect(surface.CoreCoachTools).toBe(CoreCoachTools);
     expect(surface.ProgressionEngine).toBe(ProgressionEngine);
     expect(surface.PersistenceNotWiredError).toBe(PersistenceNotWiredError);
+  });
+
+  it('exports the ProposalGenerator port interface', () => {
+    // Type-level assertion: an object shaped like ProposalGenerator compiles
+    // when typed through the barrel export.
+    const mock = {
+      propose: (): TrainingProposal => ({
+        source: 'ai',
+        intent: 'progress',
+        action: 'maintain',
+        magnitude: { kind: 'none' },
+        justification: 'test',
+        confidence: Confidence.Medium,
+      }),
+    } satisfies surface.ProposalGenerator;
+
+    expect(typeof mock.propose).toBe('function');
   });
 
   it('re-exports the boundary wire schemas unchanged', () => {

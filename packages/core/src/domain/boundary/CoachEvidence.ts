@@ -15,4 +15,6 @@ export interface CoachEvidence {
   readonly signals: readonly PerformanceSignal[];
   readonly policyLimits: typeof ProgressionPolicy;
   readonly windowConfidence: Confidence;
+  readonly evidenceAt?: Date;
+  readonly completeness?: 'full' | 'partial';
 }

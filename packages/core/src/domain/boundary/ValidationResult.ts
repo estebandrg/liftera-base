@@ -6,7 +6,8 @@ export type ViolationCode =
   | 'magnitude_exceeds_limit'
   | 'action_invalid_for_signal'
   | 'confidence_mismatch'
-  | 'policy_violation';
+  | 'policy_violation'
+  | 'magnitude_below_minimum';
 
 export interface Violation {
   readonly code: ViolationCode;

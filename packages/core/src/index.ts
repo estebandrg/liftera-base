@@ -15,6 +15,7 @@ export { ExerciseHistoryRepository } from './application/ports/ExerciseHistoryRe
 export { CoachTools } from './application/ports/CoachTools.js';
 export { RecommendationSink } from './application/ports/RecommendationSink.js';
 export { InMemoryRecommendationSink } from './application/ports/InMemoryRecommendationSink.js';
+export { ProposalGenerator } from './application/ports/ProposalGenerator.js';
 export { CoreCoachTools, CoachToolsFactory } from './application/CoreCoachTools.js';
 
 // Boundary: snapshot schema, mappers, and wire types (sole Zod site)

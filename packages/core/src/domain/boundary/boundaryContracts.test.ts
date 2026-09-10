@@ -35,6 +35,34 @@ describe('boundary contracts', () => {
     expect(evidence.windowConfidence).toBe(Confidence.Medium);
   });
 
+  it('CoachEvidence optionally carries evidenceAt and completeness', () => {
+    const now = new Date('2026-09-10T12:00:00Z');
+    const full: CoachEvidence = {
+      exerciseId: new ExerciseId('squat', 'high-bar'),
+      trend: Trend.Stable,
+      signals: [],
+      policyLimits: ProgressionPolicy,
+      windowConfidence: Confidence.Medium,
+      evidenceAt: now,
+      completeness: 'full',
+    };
+
+    expect(full.evidenceAt).toBe(now);
+    expect(full.completeness).toBe('full');
+
+    const partial: CoachEvidence = {
+      exerciseId: new ExerciseId('squat', 'high-bar'),
+      trend: Trend.Stable,
+      signals: [],
+      policyLimits: ProgressionPolicy,
+      windowConfidence: Confidence.Medium,
+      completeness: 'partial',
+    };
+
+    expect(partial.completeness).toBe('partial');
+    expect(partial.evidenceAt).toBeUndefined();
+  });
+
   it('TrainingProposal carries source, intent, action, magnitude, justification and confidence', () => {
     const proposal: TrainingProposal = {
       source: 'ai',
@@ -51,6 +79,40 @@ describe('boundary contracts', () => {
     expect(proposal.magnitude).toEqual({ kind: 'load', value: 2.5, unit: 'kg' });
     expect(proposal.justification.length).toBeGreaterThan(0);
     expect(proposal.confidence).toBe(Confidence.Medium);
+  });
+
+  it('TrainingProposal optionally carries provenance with source, intent and evidenceRefs', () => {
+    const proposal: TrainingProposal = {
+      source: 'ai',
+      intent: 'progress',
+      action: 'increaseLoad',
+      magnitude: { kind: 'load', value: 2.5, unit: 'kg' },
+      justification: 'Evidence-backed proposal.',
+      confidence: Confidence.Medium,
+      provenance: {
+        source: 'ai',
+        intent: 'conservative_progress',
+        evidenceRefs: ['decreaseVolume:percent=-20'],
+      },
+    };
+
+    expect(proposal.provenance).toBeDefined();
+    if (proposal.provenance) {
+      expect(proposal.provenance.source).toBe('ai');
+      expect(proposal.provenance.intent).toBe('conservative_progress');
+      expect(proposal.provenance.evidenceRefs).toEqual(['decreaseVolume:percent=-20']);
+    }
+
+    const withoutProvenance: TrainingProposal = {
+      source: 'user',
+      intent: 'maintain',
+      action: 'maintain',
+      magnitude: { kind: 'none' },
+      justification: 'Deload week.',
+      confidence: Confidence.Low,
+    };
+
+    expect(withoutProvenance.provenance).toBeUndefined();
   });
 
   it('ValidationResult supports the valid/adjusted/rejected tri-state with violations', () => {
@@ -87,6 +149,24 @@ describe('boundary contracts', () => {
     expect(rejected.status).toBe('rejected');
     if (rejected.status === 'rejected') {
       expect(rejected.violations[0].code).toBe('policy_violation');
+    }
+  });
+
+  it('ViolationCode accepts magnitude_below_minimum as a rejecting code', () => {
+    const violation: Violation = {
+      code: 'magnitude_below_minimum',
+      message: 'Increase magnitude 0 is below the minimum > 0.',
+      field: 'magnitude',
+      expected: '> 0',
+      actual: 0,
+    };
+
+    const rejected: ValidationResult = { status: 'rejected', violations: [violation] };
+
+    expect(rejected.status).toBe('rejected');
+    if (rejected.status === 'rejected') {
+      expect(rejected.violations[0].code).toBe('magnitude_below_minimum');
+      expect(rejected.violations[0].field).toBe('magnitude');
     }
   });
 
