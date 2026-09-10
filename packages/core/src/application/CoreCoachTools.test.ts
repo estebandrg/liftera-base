@@ -82,6 +82,7 @@ const VIOLATION_FIELD: Record<ViolationCode, 'action' | 'magnitude' | 'confidenc
   policy_violation: 'magnitude',
   action_invalid_for_signal: 'action',
   magnitude_exceeds_limit: 'magnitude',
+  magnitude_below_minimum: 'magnitude',
   confidence_mismatch: 'confidence',
 };
 
