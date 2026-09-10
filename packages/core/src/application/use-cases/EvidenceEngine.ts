@@ -6,6 +6,7 @@ import { Session } from '../../domain/exercise/Session.js';
 import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
 import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 
 /** Builds the use case once the consumer supplies a history port. */
@@ -35,7 +36,7 @@ export class EvidenceEngine {
     const progression = new ExerciseProgression(this.chronological(sessions));
     const { trend, signals } = this.trendAnalyzer.analyze(progression.sessions);
 
-    const progress = signals.find((s) => s.kind === 'progress');
+    const progress = signals.find((s): s is ProgressSignal => s instanceof ProgressSignal);
 
     return {
       exerciseId,
