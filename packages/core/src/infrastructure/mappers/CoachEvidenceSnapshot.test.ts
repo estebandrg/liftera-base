@@ -71,6 +71,28 @@ describe('CoachEvidenceSnapshotMapper.toSnapshot — evidence shape', () => {
 
     expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
+
+  it('round-trips evidenceAt and completeness through the snapshot schema', () => {
+    const now = new Date('2026-09-10T12:00:00Z');
+    const snapshot = mapper.toSnapshot(
+      evidence({
+        evidenceAt: now,
+        completeness: 'full',
+      }),
+    );
+
+    expect(snapshot.evidenceAt).toEqual(now);
+    expect(snapshot.completeness).toBe('full');
+    expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('omits evidenceAt and completeness when not present on the evidence', () => {
+    const snapshot = mapper.toSnapshot(evidence());
+
+    expect('evidenceAt' in snapshot).toBe(false);
+    expect('completeness' in snapshot).toBe(false);
+    expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
 });
 
 describe('CoachEvidenceSnapshotMapper.toSnapshot — signals discriminated union', () => {

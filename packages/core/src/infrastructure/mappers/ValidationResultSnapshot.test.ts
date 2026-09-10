@@ -87,6 +87,56 @@ describe('ValidationResultSnapshotMapper.toSnapshot — tri-state preserved', ()
     expect(snapshot).toEqual(rejected);
     expect(ValidationResultSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
+
+  it('round-trips a rejected result with magnitude_below_minimum', () => {
+    const rejected: ValidationResult = {
+      status: 'rejected',
+      violations: [
+        {
+          code: 'magnitude_below_minimum',
+          message: 'Increase magnitude 0 is below the minimum > 0.',
+          field: 'magnitude',
+          expected: '> 0',
+          actual: 0,
+        },
+      ],
+    };
+
+    const snapshot = mapper.toSnapshot(rejected);
+
+    expect(snapshot).toEqual(rejected);
+    expect(ValidationResultSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('round-trips magnitude_below_minimum alongside other rejecting codes', () => {
+    const rejected: ValidationResult = {
+      status: 'rejected',
+      violations: [
+        {
+          code: 'magnitude_below_minimum',
+          message: 'Increase magnitude -1 is below the minimum > 0.',
+          field: 'magnitude',
+          expected: '> 0',
+          actual: -1,
+        },
+        {
+          code: 'policy_violation',
+          message: 'Structural mismatch.',
+          field: 'action',
+        },
+      ],
+    };
+
+    const snapshot = mapper.toSnapshot(rejected);
+
+    expect(snapshot.status).toBe('rejected');
+    if (snapshot.status === 'rejected') {
+      const codes = snapshot.violations.map((v) => v.code);
+      expect(codes).toContain('magnitude_below_minimum');
+      expect(codes).toContain('policy_violation');
+    }
+    expect(ValidationResultSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
 });
 
 describe('ValidationResultSnapshotMapper.toSnapshot — violations tolerate absent expected/actual', () => {

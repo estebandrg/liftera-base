@@ -16,6 +16,7 @@ export const ViolationSnapshotSchema = z.object({
     'action_invalid_for_signal',
     'confidence_mismatch',
     'policy_violation',
+    'magnitude_below_minimum',
   ]),
   message: z.string().min(1),
   field: z.enum(['action', 'magnitude', 'confidence']),

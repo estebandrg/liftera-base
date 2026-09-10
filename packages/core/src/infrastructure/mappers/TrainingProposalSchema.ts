@@ -33,6 +33,19 @@ export const TrainingProposalSchema = z.object({
   magnitude: DecisionMagnitudeSchema,
   justification: z.string().min(1),
   confidence: z.enum(['insufficient', 'low', 'medium', 'high']),
+  provenance: z
+    .object({
+      source: z.enum(['ai', 'user', 'system', 'external']),
+      intent: z.enum([
+        'progress',
+        'conservative_progress',
+        'deload',
+        'maintain',
+        'evaluate_change',
+      ]),
+      evidenceRefs: z.array(z.string().min(1)),
+    })
+    .optional(),
 });
 
 export type DecisionMagnitudeSnapshot = z.infer<typeof DecisionMagnitudeSchema>;

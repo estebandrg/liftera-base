@@ -119,6 +119,55 @@ describe('TrainingProposalSchema.safeParse — every magnitude variant', () => {
   });
 });
 
+describe('TrainingProposalSchema.safeParse — provenance support', () => {
+  it('parses a proposal with provenance and preserves source, intent, evidenceRefs', () => {
+    const result = TrainingProposalSchema.safeParse({
+      ...validProposal,
+      provenance: {
+        source: 'ai',
+        intent: 'conservative_progress',
+        evidenceRefs: ['decreaseVolume:percent=-20'],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.provenance).toEqual({
+        source: 'ai',
+        intent: 'conservative_progress',
+        evidenceRefs: ['decreaseVolume:percent=-20'],
+      });
+    }
+  });
+
+  it('strips unknown keys inside provenance while keeping known fields', () => {
+    const result = TrainingProposalSchema.safeParse({
+      ...validProposal,
+      provenance: {
+        source: 'ai',
+        intent: 'progress',
+        evidenceRefs: ['ref-1'],
+        reasoning: 'extra field that should be stripped',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect('reasoning' in result.data.provenance!).toBe(false);
+      expect(result.data.provenance!.evidenceRefs).toEqual(['ref-1']);
+    }
+  });
+
+  it('parses a proposal without provenance successfully', () => {
+    const result = TrainingProposalSchema.safeParse(validProposal);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect('provenance' in result.data).toBe(false);
+    }
+  });
+});
+
 describe('TrainingProposalMapper.fromSnapshot', () => {
   it('maps a valid payload to a domain TrainingProposal', () => {
     const proposal = new TrainingProposalMapper().fromSnapshot(validProposal);

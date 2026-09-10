@@ -80,6 +80,8 @@ export const CoachEvidenceSnapshotSchema = z.object({
   signals: z.array(SignalSnapshotSchema),
   policyLimits: PolicyLimitsSnapshotSchema,
   windowConfidence: z.enum(['insufficient', 'low', 'medium', 'high']),
+  evidenceAt: z.date().optional(),
+  completeness: z.enum(['full', 'partial']).optional(),
 });
 
 export type SignalSnapshot = z.infer<typeof SignalSnapshotSchema>;
@@ -104,6 +106,8 @@ export class CoachEvidenceSnapshotMapper {
       signals: evidence.signals.map((signal) => this.serializeSignal(signal)),
       policyLimits: this.serializePolicyLimits(evidence.policyLimits),
       windowConfidence: evidence.windowConfidence,
+      ...(evidence.evidenceAt !== undefined && { evidenceAt: evidence.evidenceAt }),
+      ...(evidence.completeness !== undefined && { completeness: evidence.completeness }),
     });
   }
 

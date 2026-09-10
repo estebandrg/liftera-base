@@ -473,6 +473,95 @@ describe('ProposalValidator — rule (d): deterministic confidence floor', () =>
   });
 });
 
+describe('ProposalValidator — rule (e): increase magnitudes must be > 0', () => {
+  const validator = new ProposalValidator();
+
+  it('rejects increaseLoad with magnitude 0 as magnitude_below_minimum', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 0, unit: 'kg' } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations).toHaveLength(1);
+    const violation = result.violations[0];
+    expect(violation.code).toBe('magnitude_below_minimum');
+    expect(violation.field).toBe('magnitude');
+    expect(violation.actual).toBe(0);
+  });
+
+  it('rejects increaseReps with magnitude -1 as magnitude_below_minimum', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseReps', magnitude: { kind: 'reps', value: -1 } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations).toHaveLength(1);
+    const violation = result.violations[0];
+    expect(violation.code).toBe('magnitude_below_minimum');
+    expect(violation.actual).toBe(-1);
+  });
+
+  it('accepts increaseLoad with a positive magnitude', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 2.5, unit: 'kg' } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('accepts increaseReps with a positive magnitude', () => {
+    const result = validator.validate(
+      proposal({ action: 'increaseReps', magnitude: { kind: 'reps', value: 1 } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('does not affect non-increase actions (maintain stays valid)', () => {
+    const result = validator.validate(
+      proposal({ action: 'maintain', magnitude: { kind: 'none' } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('does not affect decrease actions (decreaseLoad stays valid)', () => {
+    const result = validator.validate(
+      proposal({ action: 'decreaseLoad', magnitude: { kind: 'loadPercent', percent: -10 } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('rejection from rule (e) overrides a clamp from rule (c)', () => {
+    // Over-ceiling AND zero magnitude: rule (e) rejects, clamp is discarded.
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 0, unit: 'kg' } }),
+      evidence(),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const codes = result.violations.map((v) => v.code);
+    expect(codes).toContain('magnitude_below_minimum');
+    expect('adjustedMagnitude' in result).toBe(false);
+  });
+});
+
 describe('ProposalValidator — tri-state aggregation', () => {
   const validator = new ProposalValidator();
 

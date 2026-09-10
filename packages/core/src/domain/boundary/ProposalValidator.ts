@@ -149,12 +149,45 @@ const magnitudeClamp = ({ proposal, evidence }: ValidationInput): MagnitudeClamp
   return undefined;
 };
 
+// Rule (e): increase-action magnitudes must be strictly > 0. Zero or negative
+// values from the proposal source are rejected as magnitude_below_minimum.
+// This is an AI-side guard; ProgressionEngine never emits zero-magnitude
+// increases (it emits kind: 'none' instead).
+const magnitudeMinimumViolations = ({ proposal }: ValidationInput): Violation[] => {
+  const { action, magnitude } = proposal;
+  if (action !== 'increaseLoad' && action !== 'increaseReps') {
+    return [];
+  }
+  const value =
+    magnitude.kind === 'load'
+      ? magnitude.value
+      : magnitude.kind === 'reps'
+        ? magnitude.value
+        : undefined;
+  if (value === undefined) {
+    return [];
+  }
+  if (value > 0) {
+    return [];
+  }
+  return [
+    {
+      code: 'magnitude_below_minimum',
+      message: `Increase magnitude ${value} is below the minimum > 0 for action '${action}'.`,
+      field: 'magnitude',
+      expected: '> 0',
+      actual: value,
+    },
+  ];
+};
+
 // Violation codes that reject the proposal outright; any other violation
 // (currently only magnitude_exceeds_limit) produces an adjustment instead.
 const REJECTING_CODES: ReadonlySet<ViolationCode> = new Set([
   'policy_violation',
   'action_invalid_for_signal',
   'confidence_mismatch',
+  'magnitude_below_minimum',
 ]);
 
 const CONFIDENCE_RANK: Record<Confidence, number> = {
@@ -206,6 +239,7 @@ export class ProposalValidator {
     if (clamp) {
       violations.push(clamp.violation);
     }
+    violations.push(...magnitudeMinimumViolations(input));
     violations.push(...confidenceFloorViolations(input));
 
     if (violations.some((violation) => REJECTING_CODES.has(violation.code))) {
