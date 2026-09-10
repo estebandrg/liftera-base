@@ -35,39 +35,117 @@ describe('ProgressionEngine — magnitude computation', () => {
 
   const cases: {
     name: string;
-    action: 'increaseLoad' | 'decreaseLoad' | 'increaseReps' | 'maintain' | 'evaluateChange';
+    action:
+      | 'increaseLoad'
+      | 'decreaseLoad'
+      | 'increaseReps'
+      | 'decreaseVolume'
+      | 'maintain'
+      | 'evaluateChange';
     signals: PerformanceSignal[];
     trend: Trend;
     expected: DecisionMagnitude;
   }[] = [
+    // increaseLoad
     {
-      name: 'progress + improving + top reps (kg) → load increment',
+      name: 'progress + improving + top reps (kg) → full load increment',
       action: 'increaseLoad',
       signals: [progress()],
       trend: Trend.Improving,
       expected: { kind: 'load', value: 2.5, unit: 'kg' },
     },
     {
-      name: 'progress + improving + top reps (lb) → load increment',
+      name: 'progress + stable + top reps (kg) → half load increment',
       action: 'increaseLoad',
-      signals: [progress({ loadUnit: 'lb' })],
-      trend: Trend.Improving,
-      expected: { kind: 'load', value: 5, unit: 'lb' },
+      signals: [progress()],
+      trend: Trend.Stable,
+      expected: { kind: 'load', value: 1.25, unit: 'kg' },
     },
     {
-      name: 'fatigue + declining → load percent reduction',
+      name: 'increaseLoad + declining → none',
+      action: 'increaseLoad',
+      signals: [progress()],
+      trend: Trend.Declining,
+      expected: { kind: 'none' },
+    },
+    {
+      name: 'increaseLoad + no evidence → none',
+      action: 'increaseLoad',
+      signals: [],
+      trend: Trend.Improving,
+      expected: { kind: 'none' },
+    },
+
+    // increaseReps
+    {
+      name: 'stagnation + improving + low reps → full rep increment',
+      action: 'increaseReps',
+      signals: [stagnation()],
+      trend: Trend.Improving,
+      expected: { kind: 'reps', value: 1 },
+    },
+    {
+      name: 'stagnation + stable + low reps → none',
+      action: 'increaseReps',
+      signals: [stagnation()],
+      trend: Trend.Stable,
+      expected: { kind: 'none' },
+    },
+    {
+      name: 'increaseReps + declining → none',
+      action: 'increaseReps',
+      signals: [stagnation()],
+      trend: Trend.Declining,
+      expected: { kind: 'none' },
+    },
+
+    // decreaseLoad
+    {
+      name: 'fatigue + declining → full load percent reduction',
       action: 'decreaseLoad',
       signals: [fatigue()],
       trend: Trend.Declining,
       expected: { kind: 'loadPercent', percent: -10 },
     },
     {
-      name: 'stagnation + stable + low reps → rep increment',
-      action: 'increaseReps',
-      signals: [stagnation()],
+      name: 'fatigue + stable → half load percent reduction',
+      action: 'decreaseLoad',
+      signals: [fatigue()],
       trend: Trend.Stable,
-      expected: { kind: 'reps', value: 1 },
+      expected: { kind: 'loadPercent', percent: -5 },
     },
+    {
+      name: 'decreaseLoad + improving → none',
+      action: 'decreaseLoad',
+      signals: [fatigue()],
+      trend: Trend.Improving,
+      expected: { kind: 'none' },
+    },
+
+    // decreaseVolume
+    {
+      name: 'fatigue + declining → full volume reduction',
+      action: 'decreaseVolume',
+      signals: [fatigue()],
+      trend: Trend.Declining,
+      expected: { kind: 'sets', value: -1 },
+    },
+    {
+      name: 'decreaseVolume + stable → none',
+      action: 'decreaseVolume',
+      signals: [fatigue()],
+      trend: Trend.Stable,
+      expected: { kind: 'none' },
+    },
+    {
+      name: 'decreaseVolume + improving → none',
+      action: 'decreaseVolume',
+      signals: [fatigue()],
+      trend: Trend.Improving,
+      expected: { kind: 'none' },
+    },
+
+    // maintain / evaluateChange
     {
       name: 'no signal → none',
       action: 'maintain',
