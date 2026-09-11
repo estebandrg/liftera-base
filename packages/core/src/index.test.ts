@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as surface from './index.js';
+import { SignalDetector } from './domain/services/SignalDetector.js';
+import { SessionPerformance } from './domain/services/SessionInterpreter.js';
 import { ProposalValidator } from './domain/boundary/ProposalValidator.js';
 import { CoachEvidence } from './domain/boundary/CoachEvidence.js';
 import { TrainingProposal } from './domain/boundary/TrainingProposal.js';
@@ -52,6 +54,13 @@ describe('package surface — boundary value exports', () => {
     expect(surface.CoreCoachTools).toBe(CoreCoachTools);
     expect(surface.ProgressionEngine).toBe(ProgressionEngine);
     expect(surface.PersistenceNotWiredError).toBe(PersistenceNotWiredError);
+  });
+
+  it('exports SignalDetector and SessionInterpreter types from the public barrel', () => {
+    expect(surface.SignalDetector).toBe(SignalDetector);
+    // Type-level: EffectiveRir is exported as a type; at runtime we verify
+    // the constructor it belongs to is reachable.
+    expect(surface.SessionPerformance).toBe(SessionPerformance);
   });
 
   it('exports the ProposalGenerator port interface', () => {
