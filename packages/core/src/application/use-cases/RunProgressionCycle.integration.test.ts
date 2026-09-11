@@ -14,6 +14,8 @@ import { Load } from '../../domain/value-objects/Load.js';
 import { Reps } from '../../domain/value-objects/Reps.js';
 import { RIR } from '../../domain/value-objects/RIR.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { ProposalValidator } from '../../domain/boundary/ProposalValidator.js';
 import { Confidence } from '../../domain/value-objects/Confidence.js';
 import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
@@ -58,7 +60,12 @@ const sessionOn = (day: number, kg: number, reps: number, rir?: number): Session
 
 const buildCycle = (history: FakeExerciseHistoryRepository, proposalSource: ProposalGenerator) => {
   const sink = new InMemoryRecommendationSink();
-  const engine = new EvidenceEngine(history, new TrendAnalyzer());
+  const engine = new EvidenceEngine(
+    history,
+    new SessionInterpreter(),
+    new TrendAnalyzer(),
+    new SignalDetector(),
+  );
   const validator = new ProposalValidator();
   const tools = new CoreCoachTools(engine, validator, sink);
   return { cycle: new RunProgressionCycle(history, tools, proposalSource), sink };

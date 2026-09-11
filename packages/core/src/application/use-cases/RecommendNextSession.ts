@@ -5,6 +5,8 @@ import { ExerciseProgression } from '../../domain/exercise/ExerciseProgression.j
 import { Session } from '../../domain/exercise/Session.js';
 import { Recommendation } from '../../domain/recommendation/Recommendation.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { DecisionEngine } from '../../domain/services/DecisionEngine.js';
 import { RecommendationEngine } from '../../domain/services/RecommendationEngine.js';
 import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
@@ -26,7 +28,9 @@ export class RecommendNextSession {
 
   constructor(
     private readonly history: ExerciseHistoryRepository,
+    private readonly sessionInterpreter: SessionInterpreter,
     private readonly trendAnalyzer: TrendAnalyzer,
+    private readonly signalDetector: SignalDetector,
     private readonly decisionEngine: DecisionEngine,
     private readonly recommendationEngine: RecommendationEngine,
   ) {}
@@ -53,7 +57,9 @@ export class RecommendNextSession {
       };
     }
 
-    const { trend, signals } = this.trendAnalyzer.analyze(progression.sessions);
+    const performances = this.sessionInterpreter.interpret(progression.sessions);
+    const trend = this.trendAnalyzer.classifyTrend(performances);
+    const signals = this.signalDetector.detect(performances, trend);
     const decision = this.decisionEngine.recommend(signals, trend);
     return this.recommendationEngine.translate(decision);
   }

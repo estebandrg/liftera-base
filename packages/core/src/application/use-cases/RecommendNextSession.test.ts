@@ -10,6 +10,8 @@ import { Load } from '../../domain/value-objects/Load.js';
 import { Reps } from '../../domain/value-objects/Reps.js';
 import { RIR } from '../../domain/value-objects/RIR.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { DecisionEngine } from '../../domain/services/DecisionEngine.js';
 import { RecommendationEngine } from '../../domain/services/RecommendationEngine.js';
 
@@ -54,7 +56,9 @@ const topSetOnly = (day: number, kg: number, reps: number, rir?: number): Sessio
 const buildUseCase = (history: ExerciseHistoryRepository): RecommendNextSession =>
   new RecommendNextSession(
     history,
+    new SessionInterpreter(),
     new TrendAnalyzer(),
+    new SignalDetector(),
     new DecisionEngine(),
     new RecommendationEngine(),
   );

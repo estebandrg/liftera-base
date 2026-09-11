@@ -59,6 +59,10 @@ export {
   ValidationResultSnapshotMapper,
 } from './infrastructure/mappers/ValidationResultSnapshot.js';
 
+// Domain services
+export { SignalDetector } from './domain/services/SignalDetector.js';
+export { SessionPerformance, EffectiveRir } from './domain/services/SessionInterpreter.js';
+
 // Boundary domain: the contracts every external actor flows through
 export { CoachEvidence } from './domain/boundary/CoachEvidence.js';
 export {

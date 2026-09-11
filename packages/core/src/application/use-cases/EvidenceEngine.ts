@@ -6,6 +6,8 @@ import { Session } from '../../domain/exercise/Session.js';
 import { CoachEvidence } from '../../domain/boundary/CoachEvidence.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
 import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 
@@ -23,7 +25,9 @@ export class EvidenceEngine {
 
   constructor(
     private readonly history: ExerciseHistoryRepository,
+    private readonly sessionInterpreter: SessionInterpreter,
     private readonly trendAnalyzer: TrendAnalyzer,
+    private readonly signalDetector: SignalDetector,
   ) {}
 
   async produceEvidence(exerciseId: ExerciseId): Promise<CoachEvidence> {
@@ -34,7 +38,9 @@ export class EvidenceEngine {
 
     const sessions = await this.history.getRecentSessions(exerciseId, EvidenceEngine.WINDOW_SIZE);
     const progression = new ExerciseProgression(this.chronological(sessions));
-    const { trend, signals } = this.trendAnalyzer.analyze(progression.sessions);
+    const performances = this.sessionInterpreter.interpret(progression.sessions);
+    const trend = this.trendAnalyzer.classifyTrend(performances);
+    const signals = this.signalDetector.detect(performances, trend);
 
     const progress = signals.find((s): s is ProgressSignal => s instanceof ProgressSignal);
 

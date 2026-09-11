@@ -14,6 +14,8 @@ import { LoggedSet } from '../domain/exercise/LoggedSet.js';
 import { Session } from '../domain/exercise/Session.js';
 import { ProgressionPolicy } from '../domain/recommendation/ProgressionPolicy.js';
 import { TrendAnalyzer } from '../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../domain/services/SignalDetector.js';
 import { Confidence } from '../domain/value-objects/Confidence.js';
 import { Load } from '../domain/value-objects/Load.js';
 import { Reps } from '../domain/value-objects/Reps.js';
@@ -108,7 +110,12 @@ const adjusted: ValidationResult = {
 };
 
 const buildTools = (history: ExerciseHistoryRepository, sink?: InMemoryRecommendationSink) => {
-  const engine = new EvidenceEngine(history, new TrendAnalyzer());
+  const engine = new EvidenceEngine(
+    history,
+    new SessionInterpreter(),
+    new TrendAnalyzer(),
+    new SignalDetector(),
+  );
   const validator = new ProposalValidator();
   return { tools: new CoreCoachTools(engine, validator, sink), engine, validator };
 };

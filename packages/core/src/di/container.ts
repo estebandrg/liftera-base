@@ -1,5 +1,6 @@
 import { SessionInterpreter } from '../domain/services/SessionInterpreter.js';
 import { TrendAnalyzer } from '../domain/services/TrendAnalyzer.js';
+import { SignalDetector } from '../domain/services/SignalDetector.js';
 import { DecisionEngine } from '../domain/services/DecisionEngine.js';
 import { RecommendationEngine } from '../domain/services/RecommendationEngine.js';
 import { ProgressionEngine } from '../domain/services/ProgressionEngine.js';
@@ -37,6 +38,7 @@ export class DIContainer {
 export const CoreTokens = {
   sessionInterpreter: 'core.sessionInterpreter',
   trendAnalyzer: 'core.trendAnalyzer',
+  signalDetector: 'core.signalDetector',
   decisionEngine: 'core.decisionEngine',
   recommendationEngine: 'core.recommendationEngine',
   progressionEngine: 'core.progressionEngine',
@@ -51,6 +53,7 @@ export const container = new DIContainer();
 
 container.register(CoreTokens.sessionInterpreter, new SessionInterpreter());
 container.register(CoreTokens.trendAnalyzer, new TrendAnalyzer());
+container.register(CoreTokens.signalDetector, new SignalDetector());
 container.register(CoreTokens.decisionEngine, new DecisionEngine());
 container.register(CoreTokens.recommendationEngine, new RecommendationEngine());
 container.register(CoreTokens.progressionEngine, new ProgressionEngine());
@@ -58,7 +61,9 @@ container.register(CoreTokens.progressionEngine, new ProgressionEngine());
 const recommendNextSessionFactory: RecommendNextSessionFactory = (history) =>
   new RecommendNextSession(
     history,
+    container.resolve<SessionInterpreter>(CoreTokens.sessionInterpreter),
     container.resolve<TrendAnalyzer>(CoreTokens.trendAnalyzer),
+    container.resolve<SignalDetector>(CoreTokens.signalDetector),
     container.resolve<DecisionEngine>(CoreTokens.decisionEngine),
     container.resolve<RecommendationEngine>(CoreTokens.recommendationEngine),
   );
@@ -68,7 +73,12 @@ container.register(CoreTokens.proposalValidator, new ProposalValidator());
 container.register(CoreTokens.recommendationSink, new InMemoryRecommendationSink());
 
 const evidenceEngineFactory: EvidenceEngineFactory = (history) =>
-  new EvidenceEngine(history, container.resolve<TrendAnalyzer>(CoreTokens.trendAnalyzer));
+  new EvidenceEngine(
+    history,
+    container.resolve<SessionInterpreter>(CoreTokens.sessionInterpreter),
+    container.resolve<TrendAnalyzer>(CoreTokens.trendAnalyzer),
+    container.resolve<SignalDetector>(CoreTokens.signalDetector),
+  );
 container.register(CoreTokens.evidenceEngine, evidenceEngineFactory);
 
 const coachToolsFactory: CoachToolsFactory = (history) =>

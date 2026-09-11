@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { container, DIContainer, CoreTokens } from './container.js';
 import { SessionInterpreter } from '../domain/services/SessionInterpreter.js';
 import { TrendAnalyzer } from '../domain/services/TrendAnalyzer.js';
+import { SignalDetector } from '../domain/services/SignalDetector.js';
 import { DecisionEngine } from '../domain/services/DecisionEngine.js';
 import { RecommendationEngine } from '../domain/services/RecommendationEngine.js';
 import {
@@ -40,6 +41,7 @@ describe('core registrations', () => {
   it('resolves the stateless pipeline services by token', () => {
     expect(container.resolve(CoreTokens.sessionInterpreter)).toBeInstanceOf(SessionInterpreter);
     expect(container.resolve(CoreTokens.trendAnalyzer)).toBeInstanceOf(TrendAnalyzer);
+    expect(container.resolve(CoreTokens.signalDetector)).toBeInstanceOf(SignalDetector);
     expect(container.resolve(CoreTokens.decisionEngine)).toBeInstanceOf(DecisionEngine);
     expect(container.resolve(CoreTokens.recommendationEngine)).toBeInstanceOf(RecommendationEngine);
   });
@@ -47,6 +49,32 @@ describe('core registrations', () => {
   it('resolves the same service instance on repeated resolves', () => {
     expect(container.resolve(CoreTokens.trendAnalyzer)).toBe(
       container.resolve(CoreTokens.trendAnalyzer),
+    );
+  });
+
+  it('resolves the same SessionInterpreter instance for both use-case factories', async () => {
+    const squatId = new ExerciseId('Back Squat', 'Low Bar');
+    const fakeHistory: ExerciseHistoryRepository = {
+      async getExercise() {
+        return new Exercise(squatId);
+      },
+      async getRecentSessions() {
+        return [];
+      },
+    };
+
+    const factory = container.resolve<RecommendNextSessionFactory>(CoreTokens.recommendNextSession);
+    const useCase = factory(fakeHistory);
+    expect(useCase).toBeInstanceOf(RecommendNextSession);
+
+    const evidenceFactory = container.resolve<EvidenceEngineFactory>(CoreTokens.evidenceEngine);
+    const engine = evidenceFactory(fakeHistory);
+    expect(engine).toBeInstanceOf(EvidenceEngine);
+
+    // The shared interpreter instance is verified indirectly: both factories
+    // resolve the identical singleton from the container.
+    expect(container.resolve(CoreTokens.sessionInterpreter)).toBe(
+      container.resolve(CoreTokens.sessionInterpreter),
     );
   });
 

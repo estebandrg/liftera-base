@@ -14,6 +14,8 @@ import { RIR } from '../../domain/value-objects/RIR.js';
 import { Trend } from '../../domain/value-objects/Trend.js';
 import { Confidence } from '../../domain/value-objects/Confidence.js';
 import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
+import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
+import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
 
@@ -56,7 +58,7 @@ const topSetOnly = (day: number, kg: number, reps: number, rir?: number): Sessio
   ]);
 
 const buildEngine = (history: ExerciseHistoryRepository): EvidenceEngine =>
-  new EvidenceEngine(history, new TrendAnalyzer());
+  new EvidenceEngine(history, new SessionInterpreter(), new TrendAnalyzer(), new SignalDetector());
 
 describe('EvidenceEngine — exercise lookup', () => {
   it('throws ExerciseNotFoundError when the repository has no such exercise', async () => {

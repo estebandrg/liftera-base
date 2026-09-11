@@ -1,35 +1,12 @@
-import { Session } from '../exercise/Session.js';
 import { Trend } from '../value-objects/Trend.js';
-import { PerformanceSignal } from '../signals/PerformanceSignal.js';
 import { ProgressionPolicy } from '../recommendation/ProgressionPolicy.js';
-import { SessionInterpreter, SessionPerformance } from './SessionInterpreter.js';
-import { SignalDetector } from './SignalDetector.js';
-
-export interface TrendAnalysis {
-  readonly trend: Trend;
-  readonly signals: PerformanceSignal[];
-}
+import { SessionPerformance } from './SessionInterpreter.js';
 
 /**
- * Classifies the window trend and detects performance signals.
- * Pure and stateless: all facts come from SessionInterpreter.
+ * Classifies a SessionPerformance window into a Trend.
+ * Pure and stateless.
  */
 export class TrendAnalyzer {
-  private readonly interpreter = new SessionInterpreter();
-  private readonly signalDetector = new SignalDetector();
-
-  analyze(sessions: Session[]): TrendAnalysis {
-    const performances = this.interpreter.interpret(sessions);
-    if (performances.length < 2) {
-      return { trend: Trend.Stable, signals: [] };
-    }
-
-    const trend = this.classifyTrend(performances);
-    const signals = this.signalDetector.detect(performances, trend);
-
-    return { trend, signals };
-  }
-
   classifyTrend(performances: SessionPerformance[]): Trend {
     if (performances.length < 2) {
       return Trend.Stable;
