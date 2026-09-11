@@ -1,12 +1,9 @@
 import { Session } from '../exercise/Session.js';
 import { Trend } from '../value-objects/Trend.js';
 import { PerformanceSignal } from '../signals/PerformanceSignal.js';
-import { ProgressSignal } from '../signals/ProgressSignal.js';
-import { StagnationSignal } from '../signals/StagnationSignal.js';
-import { FatigueSignal } from '../signals/FatigueSignal.js';
-import { RegressionSignal } from '../signals/RegressionSignal.js';
 import { ProgressionPolicy } from '../recommendation/ProgressionPolicy.js';
 import { SessionInterpreter, SessionPerformance } from './SessionInterpreter.js';
+import { SignalDetector } from './SignalDetector.js';
 
 export interface TrendAnalysis {
   readonly trend: Trend;
@@ -19,6 +16,7 @@ export interface TrendAnalysis {
  */
 export class TrendAnalyzer {
   private readonly interpreter = new SessionInterpreter();
+  private readonly signalDetector = new SignalDetector();
 
   analyze(sessions: Session[]): TrendAnalysis {
     const performances = this.interpreter.interpret(sessions);
@@ -26,84 +24,23 @@ export class TrendAnalyzer {
       return { trend: Trend.Stable, signals: [] };
     }
 
-    const first = performances[0];
-    const last = performances[performances.length - 1];
-    const volumeChangePct = ((last.volume.value - first.volume.value) / first.volume.value) * 100;
-    const trend = this.classifyTrend(volumeChangePct);
-    const rirInAllSessions = performances.every((p) => p.effectiveRir !== 'unknown');
-
-    const signals: PerformanceSignal[] = [];
-
-    if (volumeChangePct > ProgressionPolicy.VOLUME_FLAT_TOLERANCE_PCT) {
-      const lastRir = last.effectiveRir;
-      // With RIR: progress requires high effort (RIR <= 2).
-      // Without RIR anywhere: volume/reps deltas drive classification (design row 7).
-      if (lastRir === 'unknown' || lastRir <= ProgressionPolicy.PROGRESS_RIR_MAX) {
-        signals.push(
-          new ProgressSignal({
-            windowSize: performances.length,
-            volumeChangePct,
-            lastEffectiveRir: lastRir,
-            rirInAllSessions,
-            topSetReps: last.topSet.reps.value,
-            loadUnit: last.topSet.load.unit,
-          }),
-        );
-      }
-    } else if (volumeChangePct < -ProgressionPolicy.VOLUME_FLAT_TOLERANCE_PCT) {
-      const lastRir = last.effectiveRir;
-      // Fatigue requires effort evidence: a decline with high RIR.
-      if (lastRir !== 'unknown' && lastRir >= ProgressionPolicy.FATIGUE_RIR_MIN) {
-        signals.push(
-          new FatigueSignal({
-            windowSize: performances.length,
-            volumeChangePct,
-            lastEffectiveRir: lastRir,
-          }),
-        );
-      } else {
-        // Decline with low or unknown effort is regression, never fatigue.
-        signals.push(
-          new RegressionSignal({
-            windowSize: performances.length,
-            volumeChangePct,
-            lastEffectiveRir: lastRir,
-          }),
-        );
-      }
-    } else if (Math.abs(volumeChangePct) <= ProgressionPolicy.VOLUME_FLAT_TOLERANCE_PCT) {
-      if (this.isWindowFlat(performances)) {
-        signals.push(
-          new StagnationSignal({
-            windowSize: performances.length,
-            volumeChangePct,
-            topSetReps: last.topSet.reps.value,
-            loadUnit: last.topSet.load.unit,
-          }),
-        );
-      }
-    }
+    const trend = this.classifyTrend(performances);
+    const signals = this.signalDetector.detect(performances, trend);
 
     return { trend, signals };
   }
 
-  /**
-   * Flat means: identical top-set load across the window and a top-set
-   * reps drift within the policy tolerance. Volume flatness is already
-   * guaranteed by the caller's branch.
-   */
-  private isWindowFlat(performances: SessionPerformance[]): boolean {
-    const firstTopSet = performances[0].topSet;
-    const loadsFlat = performances.every((p) => p.topSet.load.equals(firstTopSet.load));
-    if (!loadsFlat) {
-      return false;
+  classifyTrend(performances: SessionPerformance[]): Trend {
+    if (performances.length < 2) {
+      return Trend.Stable;
     }
-    const repsValues = performances.map((p) => p.topSet.reps.value);
-    const drift = Math.max(...repsValues) - Math.min(...repsValues);
-    return drift <= ProgressionPolicy.REPS_FLAT_TOLERANCE;
+    const first = performances[0];
+    const last = performances[performances.length - 1];
+    const volumeChangePct = ((last.volume.value - first.volume.value) / first.volume.value) * 100;
+    return this.classifyTrendFromPct(volumeChangePct);
   }
 
-  private classifyTrend(volumeChangePct: number): Trend {
+  private classifyTrendFromPct(volumeChangePct: number): Trend {
     if (volumeChangePct > ProgressionPolicy.VOLUME_FLAT_TOLERANCE_PCT) {
       return Trend.Improving;
     }
