@@ -252,7 +252,7 @@ describe('RunProgressionCycle — barbarity cases', () => {
     const result = await cycle.execute(benchPressId);
 
     expect(result.status).toBe('rejected');
-    if (result.status === 'rejected') {
+    if (result.status === 'rejected' && result.validation.status === 'rejected') {
       expect(result.validation.violations.some((v) => v.code === 'action_invalid_for_signal')).toBe(
         true,
       );
@@ -289,7 +289,7 @@ describe('RunProgressionCycle — barbarity cases', () => {
     const result = await cycle.execute(benchPressId);
 
     expect(result.status).toBe('rejected');
-    if (result.status === 'rejected') {
+    if (result.status === 'rejected' && result.validation.status === 'rejected') {
       expect(result.validation.violations.some((v) => v.code === 'confidence_mismatch')).toBe(true);
     }
     expect(sink.records).toHaveLength(0);

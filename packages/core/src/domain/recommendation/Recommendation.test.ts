@@ -32,11 +32,14 @@ describe('Recommendation', () => {
   });
 
   it('narrows the union by status discriminant', () => {
-    const insufficient: Recommendation = {
+    // Sourced from a factory so the declared union type survives
+    // control-flow narrowing of the const initializer.
+    const make = (): Recommendation => ({
       status: 'insufficient_data',
       confidence: Confidence.Insufficient,
       reason: 'Not enough data.',
-    };
+    });
+    const insufficient = make();
 
     if (insufficient.status === 'ok') {
       throw new Error('should not narrow to actionable');

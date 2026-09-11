@@ -47,10 +47,9 @@ describe('AIMock — rule-table proposals', () => {
       trend: Trend.Declining,
       signals: [
         new FatigueSignal({
-          loadUnit: 'kg',
+          windowSize: 3,
           volumeChangePct: -10,
-          topSetReps: 8,
-          rirInAllSessions: false,
+          lastEffectiveRir: 5,
         }),
       ],
     });
@@ -77,10 +76,12 @@ describe('AIMock — rule-table proposals', () => {
       trend: Trend.Improving,
       signals: [
         new ProgressSignal({
-          loadUnit: 'kg',
+          windowSize: 3,
           volumeChangePct: 20,
-          topSetReps: 12,
+          lastEffectiveRir: 2,
           rirInAllSessions: true,
+          topSetReps: 12,
+          loadUnit: 'kg',
         }),
       ],
     });
@@ -105,10 +106,9 @@ describe('AIMock — rule-table proposals', () => {
       trend: Trend.Declining,
       signals: [
         new FatigueSignal({
-          loadUnit: 'kg',
+          windowSize: 3,
           volumeChangePct: -10,
-          topSetReps: 8,
-          rirInAllSessions: false,
+          lastEffectiveRir: 5,
         }),
       ],
     });
