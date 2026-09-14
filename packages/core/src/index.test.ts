@@ -12,6 +12,7 @@ import { InMemoryRecommendationSink } from './application/ports/InMemoryRecommen
 import { CoreCoachTools } from './application/CoreCoachTools.js';
 import { ProgressionEngine } from './domain/services/ProgressionEngine.js';
 import { PersistenceNotWiredError } from './domain/errors/DomainErrors.js';
+import { AthleteProfile } from './domain/value-objects/AthleteProfile.js';
 import {
   DecisionMagnitudeSchema,
   TrainingProposalSchema,
@@ -54,6 +55,7 @@ describe('package surface — boundary value exports', () => {
     expect(surface.CoreCoachTools).toBe(CoreCoachTools);
     expect(surface.ProgressionEngine).toBe(ProgressionEngine);
     expect(surface.PersistenceNotWiredError).toBe(PersistenceNotWiredError);
+    expect(surface.AthleteProfile).toBe(AthleteProfile);
   });
 
   it('exports SignalDetector and SessionInterpreter types from the public barrel', () => {

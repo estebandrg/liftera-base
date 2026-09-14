@@ -90,6 +90,7 @@ export { Reps } from './domain/value-objects/Reps.js';
 export { RIR } from './domain/value-objects/RIR.js';
 export { Volume } from './domain/value-objects/Volume.js';
 export { Confidence } from './domain/value-objects/Confidence.js';
+export { AthleteProfile } from './domain/value-objects/AthleteProfile.js';
 export {
   Recommendation,
   ActionableRecommendation,
