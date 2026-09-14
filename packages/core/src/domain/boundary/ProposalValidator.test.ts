@@ -12,6 +12,7 @@ import { ProgressSignal, ProgressEvidence } from '../signals/ProgressSignal.js';
 import { FatigueSignal } from '../signals/FatigueSignal.js';
 import { RegressionSignal } from '../signals/RegressionSignal.js';
 import { StagnationSignal } from '../signals/StagnationSignal.js';
+import { AthleteProfile } from '../value-objects/AthleteProfile.js';
 
 // Neutral baseline: no signals (no coherence restriction), stable trend,
 // high window confidence so a medium proposal confidence stays below the
@@ -629,5 +630,118 @@ describe('ProposalValidator — tri-state aggregation', () => {
     expect(result.adjustedMagnitude).toEqual({ kind: 'load', value: 2.5, unit: 'kg' });
     expect(result.violations).toHaveLength(1);
     expect(result.violations[0].code).toBe('magnitude_exceeds_limit');
+  });
+});
+
+describe('ProposalValidator — limitation veto rule', () => {
+  const validator = new ProposalValidator();
+
+  it('rejects a proposal whose exercise exactly matches a limitation', () => {
+    const profile = new AthleteProfile({ limitations: ['squat'] });
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('squat', 'high-bar'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations).toHaveLength(1);
+    const violation = result.violations[0];
+    expect(violation.code).toBe('limitation_violation');
+    expect(violation.field).toBe('action');
+    expect(violation.message).toContain('squat');
+    expect(violation.actual).toBe('squat');
+  });
+
+  it('does not reject a substring miss (front squat vs squat limitation)', () => {
+    const profile = new AthleteProfile({ limitations: ['squat'] });
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('front squat', 'high-bar'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('skips the veto when athleteProfile is absent', () => {
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('squat', 'high-bar') }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('skips the veto when limitations are absent (undefined)', () => {
+    const profile = new AthleteProfile({});
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('squat', 'high-bar'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('skips the veto when limitations are empty (defensive check)', () => {
+    // AthleteProfile constructor throws for empty limitations, but the
+    // validator must still be defensive against an empty array at runtime.
+    const profile = { limitations: [], forbids: () => false } as unknown as AthleteProfile;
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('squat', 'high-bar'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('structured reason contains the forbidden exercise name and matched limitation', () => {
+    const profile = new AthleteProfile({ limitations: ['deadlift'] });
+    const result = validator.validate(
+      proposal(),
+      evidence({ exerciseId: new ExerciseId('deadlift', 'conventional'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const violation = result.violations[0];
+    expect(violation.code).toBe('limitation_violation');
+    expect(violation.message).toContain('deadlift');
+    expect(violation.actual).toBe('deadlift');
+  });
+
+  it('tri-state: veto rejects even when the proposal would otherwise be valid', () => {
+    const profile = new AthleteProfile({ limitations: ['bench press'] });
+    const result = validator.validate(
+      proposal({ action: 'maintain', magnitude: { kind: 'none' } }),
+      evidence({ exerciseId: new ExerciseId('bench press', 'flat'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    expect(result.violations[0].code).toBe('limitation_violation');
+    expect('adjustedMagnitude' in result).toBe(false);
+  });
+
+  it('tri-state: veto overrides a magnitude clamp', () => {
+    const profile = new AthleteProfile({ limitations: ['squat'] });
+    const result = validator.validate(
+      proposal({ action: 'increaseLoad', magnitude: { kind: 'load', value: 5, unit: 'kg' } }),
+      evidence({ exerciseId: new ExerciseId('squat', 'high-bar'), athleteProfile: profile }),
+    );
+
+    expect(result.status).toBe('rejected');
+    if (result.status !== 'rejected') {
+      return;
+    }
+    const codes = result.violations.map((v) => v.code);
+    expect(codes).toContain('limitation_violation');
+    expect(codes).toContain('magnitude_exceeds_limit');
+    expect('adjustedMagnitude' in result).toBe(false);
   });
 });

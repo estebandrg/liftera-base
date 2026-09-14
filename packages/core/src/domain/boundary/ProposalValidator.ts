@@ -80,6 +80,24 @@ const coherenceViolations = ({ proposal, evidence }: ValidationInput): Violation
   ];
 };
 
+// Rule (f): limitation veto (Fase 5). Rejects any proposal whose exercise
+// exactly matches a forbidden entry in the athlete's limitations.
+// Exact-match only: no fuzzy, pattern, or substring matching.
+const limitationVetoViolations = ({ evidence }: ValidationInput): Violation[] => {
+  const exerciseName = evidence.exerciseId.exerciseType;
+  if (evidence.athleteProfile?.forbids(exerciseName)) {
+    return [
+      {
+        code: 'limitation_violation',
+        message: `Exercise '${exerciseName}' is forbidden by athlete limitations.`,
+        field: 'action',
+        actual: exerciseName,
+      },
+    ];
+  }
+  return [];
+};
+
 interface MagnitudeClamp {
   readonly magnitude: DecisionMagnitude;
   readonly violation: Violation;
@@ -235,6 +253,7 @@ export class ProposalValidator {
     const violations: Violation[] = [
       ...structuralPairingViolations(input),
       ...coherenceViolations(input),
+      ...limitationVetoViolations(input),
     ];
     const clamp = magnitudeClamp(input);
     if (clamp) {
