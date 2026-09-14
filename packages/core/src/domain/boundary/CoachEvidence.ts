@@ -3,6 +3,7 @@ import { Trend } from '../value-objects/Trend.js';
 import { PerformanceSignal } from '../signals/PerformanceSignal.js';
 import { ProgressionPolicy } from '../recommendation/ProgressionPolicy.js';
 import { Confidence } from '../value-objects/Confidence.js';
+import { AthleteProfile } from '../value-objects/AthleteProfile.js';
 
 /**
  * Evidence the core hands to an external actor so it can propose the next
@@ -17,4 +18,5 @@ export interface CoachEvidence {
   readonly windowConfidence: Confidence;
   readonly evidenceAt?: Date;
   readonly completeness?: 'full' | 'partial';
+  readonly athleteProfile?: AthleteProfile;
 }

@@ -86,6 +86,7 @@ const VIOLATION_FIELD: Record<ViolationCode, 'action' | 'magnitude' | 'confidenc
   magnitude_exceeds_limit: 'magnitude',
   magnitude_below_minimum: 'magnitude',
   confidence_mismatch: 'confidence',
+  limitation_violation: 'action',
 };
 
 const rejected = (code: ViolationCode): ValidationResult => ({

@@ -188,6 +188,7 @@ const REJECTING_CODES: ReadonlySet<ViolationCode> = new Set([
   'action_invalid_for_signal',
   'confidence_mismatch',
   'magnitude_below_minimum',
+  'limitation_violation',
 ]);
 
 const CONFIDENCE_RANK: Record<Confidence, number> = {

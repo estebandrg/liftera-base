@@ -108,6 +108,25 @@ describe('ValidationResultSnapshotMapper.toSnapshot — tri-state preserved', ()
     expect(ValidationResultSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
 
+  it('round-trips a rejected result with limitation_violation', () => {
+    const rejected: ValidationResult = {
+      status: 'rejected',
+      violations: [
+        {
+          code: 'limitation_violation',
+          message: "Exercise 'squat' is forbidden by athlete limitations.",
+          field: 'action',
+          actual: 'squat',
+        },
+      ],
+    };
+
+    const snapshot = mapper.toSnapshot(rejected);
+
+    expect(snapshot).toEqual(rejected);
+    expect(ValidationResultSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
   it('round-trips magnitude_below_minimum alongside other rejecting codes', () => {
     const rejected: ValidationResult = {
       status: 'rejected',

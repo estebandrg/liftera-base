@@ -17,6 +17,7 @@ export const ViolationSnapshotSchema = z.object({
     'confidence_mismatch',
     'policy_violation',
     'magnitude_below_minimum',
+    'limitation_violation',
   ]),
   message: z.string().min(1),
   field: z.enum(['action', 'magnitude', 'confidence']),

@@ -6,6 +6,7 @@ import { ExerciseId } from '../exercise/ExerciseId.js';
 import { ProgressionPolicy } from '../recommendation/ProgressionPolicy.js';
 import { Trend } from '../value-objects/Trend.js';
 import { Confidence } from '../value-objects/Confidence.js';
+import { AthleteProfile } from '../value-objects/AthleteProfile.js';
 
 describe('boundary contracts', () => {
   it('contract modules resolve and stay type-only (zero runtime exports by design)', async () => {
@@ -168,6 +169,48 @@ describe('boundary contracts', () => {
       expect(rejected.violations[0].code).toBe('magnitude_below_minimum');
       expect(rejected.violations[0].field).toBe('magnitude');
     }
+  });
+
+  it('ViolationCode accepts limitation_violation as a rejecting code', () => {
+    const violation: Violation = {
+      code: 'limitation_violation',
+      message: "Exercise 'squat' is forbidden by athlete limitations.",
+      field: 'action',
+      actual: 'squat',
+    };
+
+    const rejected: ValidationResult = { status: 'rejected', violations: [violation] };
+
+    expect(rejected.status).toBe('rejected');
+    if (rejected.status === 'rejected') {
+      expect(rejected.violations[0].code).toBe('limitation_violation');
+      expect(rejected.violations[0].field).toBe('action');
+    }
+  });
+
+  it('CoachEvidence optionally carries athleteProfile', () => {
+    const profile = new AthleteProfile({ limitations: ['squat'] });
+    const withProfile: CoachEvidence = {
+      exerciseId: new ExerciseId('squat', 'high-bar'),
+      trend: Trend.Stable,
+      signals: [],
+      policyLimits: ProgressionPolicy,
+      windowConfidence: Confidence.Medium,
+      athleteProfile: profile,
+    };
+
+    expect(withProfile.athleteProfile).toBe(profile);
+    expect(withProfile.athleteProfile?.forbids('squat')).toBe(true);
+
+    const withoutProfile: CoachEvidence = {
+      exerciseId: new ExerciseId('squat', 'high-bar'),
+      trend: Trend.Stable,
+      signals: [],
+      policyLimits: ProgressionPolicy,
+      windowConfidence: Confidence.Medium,
+    };
+
+    expect(withoutProfile.athleteProfile).toBeUndefined();
   });
 
   it('AppliedRecommendation links the proposal, its validation and the application timestamp', () => {
