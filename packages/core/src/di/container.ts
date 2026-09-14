@@ -72,18 +72,19 @@ container.register(CoreTokens.recommendNextSession, recommendNextSessionFactory)
 container.register(CoreTokens.proposalValidator, new ProposalValidator());
 container.register(CoreTokens.recommendationSink, new InMemoryRecommendationSink());
 
-const evidenceEngineFactory: EvidenceEngineFactory = (history) =>
+const evidenceEngineFactory: EvidenceEngineFactory = (history, profile) =>
   new EvidenceEngine(
     history,
     container.resolve<SessionInterpreter>(CoreTokens.sessionInterpreter),
     container.resolve<TrendAnalyzer>(CoreTokens.trendAnalyzer),
     container.resolve<SignalDetector>(CoreTokens.signalDetector),
+    profile,
   );
 container.register(CoreTokens.evidenceEngine, evidenceEngineFactory);
 
-const coachToolsFactory: CoachToolsFactory = (history) =>
+const coachToolsFactory: CoachToolsFactory = (history, profile) =>
   new CoreCoachTools(
-    container.resolve<EvidenceEngineFactory>(CoreTokens.evidenceEngine)(history),
+    container.resolve<EvidenceEngineFactory>(CoreTokens.evidenceEngine)(history, profile),
     container.resolve<ProposalValidator>(CoreTokens.proposalValidator),
     container.resolve<InMemoryRecommendationSink>(CoreTokens.recommendationSink),
   );

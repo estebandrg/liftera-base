@@ -8,9 +8,13 @@ import { TrainingProposal } from '../domain/boundary/TrainingProposal.js';
 import { ValidationResult, AppliedRecommendation } from '../domain/boundary/ValidationResult.js';
 import { DomainInvariantError } from '../domain/errors/DomainErrors.js';
 import { ExerciseId } from '../domain/exercise/ExerciseId.js';
+import { AthleteProfile } from '../domain/value-objects/AthleteProfile.js';
 
-/** Builds the tools once the consumer supplies a history port. */
-export type CoachToolsFactory = (history: ExerciseHistoryRepository) => CoreCoachTools;
+/** Builds the tools once the consumer supplies a history port and optional profile. */
+export type CoachToolsFactory = (
+  history: ExerciseHistoryRepository,
+  profile?: AthleteProfile,
+) => CoreCoachTools;
 
 /**
  * CoachTools implementation: composes the EvidenceEngine and the universal

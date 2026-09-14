@@ -9,10 +9,14 @@ import { TrendAnalyzer } from '../../domain/services/TrendAnalyzer.js';
 import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js';
 import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
+import { AthleteProfile } from '../../domain/value-objects/AthleteProfile.js';
 import { PROGRESSION_WINDOW_SIZE } from './ProgressionWindow.js';
 
-/** Builds the use case once the consumer supplies a history port. */
-export type EvidenceEngineFactory = (history: ExerciseHistoryRepository) => EvidenceEngine;
+/** Builds the use case once the consumer supplies a history port and optional profile. */
+export type EvidenceEngineFactory = (
+  history: ExerciseHistoryRepository,
+  profile?: AthleteProfile,
+) => EvidenceEngine;
 
 /**
  * Produces the CoachEvidence an external actor needs to propose the next
@@ -28,6 +32,7 @@ export class EvidenceEngine {
     private readonly sessionInterpreter: SessionInterpreter,
     private readonly trendAnalyzer: TrendAnalyzer,
     private readonly signalDetector: SignalDetector,
+    private readonly athleteProfile?: AthleteProfile,
   ) {}
 
   async produceEvidence(exerciseId: ExerciseId): Promise<CoachEvidence> {
@@ -52,6 +57,7 @@ export class EvidenceEngine {
       windowConfidence: progression.windowConfidence(),
       evidenceAt: new Date(),
       completeness: progress?.evidence.rirInAllSessions === true ? 'full' : 'partial',
+      ...(this.athleteProfile !== undefined && { athleteProfile: this.athleteProfile }),
     };
   }
 

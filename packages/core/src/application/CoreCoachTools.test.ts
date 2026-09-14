@@ -21,6 +21,7 @@ import { Load } from '../domain/value-objects/Load.js';
 import { Reps } from '../domain/value-objects/Reps.js';
 import { RIR } from '../domain/value-objects/RIR.js';
 import { Trend } from '../domain/value-objects/Trend.js';
+import { AthleteProfile } from '../domain/value-objects/AthleteProfile.js';
 
 /**
  * In-memory fake of the history port (RecommendNextSession.test.ts pattern).
@@ -254,5 +255,26 @@ describe('CoreCoachTools — validateProposal delegation', () => {
     expect(first).toEqual(second);
     expect(first.status).toBe('valid');
     expect(produceSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('CoreCoachTools — profile propagation', () => {
+  it('forwards profile through the factory so evidence carries it', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [sessionOn(1)]);
+    const profile = new AthleteProfile({ limitations: ['bench press'] });
+
+    const engine = new EvidenceEngine(
+      history,
+      new SessionInterpreter(),
+      new TrendAnalyzer(),
+      new SignalDetector(),
+      profile,
+    );
+    const tools = new CoreCoachTools(engine, new ProposalValidator());
+
+    const result = await tools.getCoachEvidence(benchPressId);
+
+    expect(result.athleteProfile).toBe(profile);
   });
 });

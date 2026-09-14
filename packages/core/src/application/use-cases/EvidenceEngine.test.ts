@@ -18,6 +18,7 @@ import { SessionInterpreter } from '../../domain/services/SessionInterpreter.js'
 import { SignalDetector } from '../../domain/services/SignalDetector.js';
 import { ProgressSignal } from '../../domain/signals/ProgressSignal.js';
 import { ProgressionPolicy } from '../../domain/recommendation/ProgressionPolicy.js';
+import { AthleteProfile } from '../../domain/value-objects/AthleteProfile.js';
 
 /**
  * In-memory fake of the history port (GoldenValidation pattern): async at
@@ -219,6 +220,41 @@ describe('EvidenceEngine — policy limits', () => {
     const second = await engine.produceEvidence(benchPressId);
 
     expect(first.policyLimits).toBe(second.policyLimits);
+  });
+});
+
+describe('EvidenceEngine — profile plumbing', () => {
+  it('attaches athleteProfile to CoachEvidence when provided in constructor', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [topSetOnly(1, 100, 10, 2)]);
+    const profile = new AthleteProfile({ limitations: ['bench press'] });
+    const engine = new EvidenceEngine(
+      history,
+      new SessionInterpreter(),
+      new TrendAnalyzer(),
+      new SignalDetector(),
+      profile,
+    );
+
+    const evidence = await engine.produceEvidence(benchPressId);
+
+    expect(evidence.athleteProfile).toBe(profile);
+    expect(evidence.athleteProfile?.forbids('bench press')).toBe(true);
+  });
+
+  it('omits athleteProfile from CoachEvidence when not provided', async () => {
+    const history = new FakeExerciseHistoryRepository();
+    history.seed(new Exercise(benchPressId), [topSetOnly(1, 100, 10, 2)]);
+    const engine = new EvidenceEngine(
+      history,
+      new SessionInterpreter(),
+      new TrendAnalyzer(),
+      new SignalDetector(),
+    );
+
+    const evidence = await engine.produceEvidence(benchPressId);
+
+    expect(evidence.athleteProfile).toBeUndefined();
   });
 });
 
