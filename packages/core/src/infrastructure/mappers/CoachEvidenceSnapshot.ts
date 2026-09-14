@@ -7,6 +7,7 @@ import { FatigueSignal } from '../../domain/signals/FatigueSignal.js';
 import { RegressionSignal } from '../../domain/signals/RegressionSignal.js';
 import { StagnationSignal } from '../../domain/signals/StagnationSignal.js';
 import { DomainInvariantError } from '../../domain/errors/DomainErrors.js';
+import { AthleteProfile } from '../../domain/value-objects/AthleteProfile.js';
 
 /**
  * Outbound boundary schema for CoachEvidence. The evidence is domain-trusted;
@@ -71,6 +72,13 @@ export const PolicyLimitsSnapshotSchema = z.object({
   fatigueRirMin: z.number(),
 });
 
+export const AthleteProfileSnapshotSchema = z.object({
+  methodology: z.string().optional(),
+  experience: z.string().optional(),
+  limitations: z.array(z.string().min(1)).optional(),
+  goals: z.string().optional(),
+});
+
 export const CoachEvidenceSnapshotSchema = z.object({
   exerciseId: z.object({
     exerciseType: z.string().min(1),
@@ -82,10 +90,12 @@ export const CoachEvidenceSnapshotSchema = z.object({
   windowConfidence: z.enum(['insufficient', 'low', 'medium', 'high']),
   evidenceAt: z.date().optional(),
   completeness: z.enum(['full', 'partial']).optional(),
+  athleteProfile: AthleteProfileSnapshotSchema.optional(),
 });
 
 export type SignalSnapshot = z.infer<typeof SignalSnapshotSchema>;
 export type PolicyLimitsSnapshot = z.infer<typeof PolicyLimitsSnapshotSchema>;
+export type AthleteProfileSnapshot = z.infer<typeof AthleteProfileSnapshotSchema>;
 export type CoachEvidenceSnapshot = z.infer<typeof CoachEvidenceSnapshotSchema>;
 
 /**
@@ -108,6 +118,9 @@ export class CoachEvidenceSnapshotMapper {
       windowConfidence: evidence.windowConfidence,
       ...(evidence.evidenceAt !== undefined && { evidenceAt: evidence.evidenceAt }),
       ...(evidence.completeness !== undefined && { completeness: evidence.completeness }),
+      ...(evidence.athleteProfile !== undefined && {
+        athleteProfile: this.serializeAthleteProfile(evidence.athleteProfile),
+      }),
     });
   }
 
@@ -125,6 +138,15 @@ export class CoachEvidenceSnapshotMapper {
       return { kind: signal.kind, ...signal.evidence };
     }
     throw new DomainInvariantError('Unknown performance signal; cannot serialize evidence.');
+  }
+
+  private serializeAthleteProfile(profile: AthleteProfile): AthleteProfileSnapshot {
+    return {
+      ...(profile.methodology !== undefined && { methodology: profile.methodology }),
+      ...(profile.experience !== undefined && { experience: profile.experience }),
+      ...(profile.limitations !== undefined && { limitations: [...profile.limitations] }),
+      ...(profile.goals !== undefined && { goals: profile.goals }),
+    };
   }
 
   private serializePolicyLimits(policy: typeof ProgressionPolicy): PolicyLimitsSnapshot {

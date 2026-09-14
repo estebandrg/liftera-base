@@ -12,6 +12,7 @@ import { RegressionSignal } from '../../domain/signals/RegressionSignal.js';
 import { StagnationSignal } from '../../domain/signals/StagnationSignal.js';
 import { Trend } from '../../domain/value-objects/Trend.js';
 import { Confidence } from '../../domain/value-objects/Confidence.js';
+import { AthleteProfile } from '../../domain/value-objects/AthleteProfile.js';
 
 const mapper = new CoachEvidenceSnapshotMapper();
 
@@ -91,6 +92,31 @@ describe('CoachEvidenceSnapshotMapper.toSnapshot — evidence shape', () => {
 
     expect('evidenceAt' in snapshot).toBe(false);
     expect('completeness' in snapshot).toBe(false);
+    expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('round-trips athleteProfile when present on the evidence', () => {
+    const profile = new AthleteProfile({
+      methodology: 'HIT',
+      experience: 'intermediate',
+      limitations: ['squat'],
+      goals: 'strength',
+    });
+    const snapshot = mapper.toSnapshot(evidence({ athleteProfile: profile }));
+
+    expect(snapshot.athleteProfile).toEqual({
+      methodology: 'HIT',
+      experience: 'intermediate',
+      limitations: ['squat'],
+      goals: 'strength',
+    });
+    expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
+  });
+
+  it('omits athleteProfile when not present on the evidence', () => {
+    const snapshot = mapper.toSnapshot(evidence());
+
+    expect('athleteProfile' in snapshot).toBe(false);
     expect(CoachEvidenceSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
 });
